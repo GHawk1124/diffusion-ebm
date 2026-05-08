@@ -1,0 +1,61 @@
+[project]
+name = "diffusion-ebm"
+version = "0.1.0"
+description = "THRML joint sampler for masked diffusion language models"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "thrml>=0.1.3",
+    "jax[cuda12]>=0.4.30",
+    "jaxtyping>=0.2.23",
+    "equinox>=0.11.2",
+    "torch>=2.3.0",
+    # Pin to 4.x: the MDLM trust_remote_code files (kuleshov-group/mdlm-owt) use
+    # the legacy `_tied_weights_keys` API; transformers 5.x renamed this to
+    # `all_tied_weights_keys` and crashes when loading MDLM otherwise.
+    "transformers>=4.40,<5",
+    "huggingface-hub>=0.23.0",
+    "networkx>=3.2",
+    "numpy>=1.26",
+    "matplotlib>=3.8",
+    "ipykernel>=6.29",
+    "jupyter>=1.0",
+    "tqdm>=4.66",
+    "einops>=0.7",
+    "flash-attn>=2.7,<3",
+    # Build deps that flash-attn expects to be present in the env at install time
+    # (we use no-build-isolation, so its setup.py reads them from .venv).
+    "ninja>=1.11",
+    "packaging>=24",
+    "setuptools>=70",
+    "wheel>=0.43",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/diffusion_ebm"]
+
+# Pin torch to CUDA 12.4 wheels.  PyPI's default torch picks the newest CUDA
+# build (cu130 at time of writing) which requires NVIDIA driver >=580; cu124
+# works with driver >=525 and pairs with the JAX [cuda12] runtime.
+[[tool.uv.index]]
+name = "pytorch-cu124"
+url = "https://download.pytorch.org/whl/cu124"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu124" }
+
+# PyTorch's cu124 wheels use the plain `linux_x86_64` platform tag rather than
+# `manylinux_*`, which uv treats as system-specific by default.  Declaring the
+# required environment lets uv accept those wheels on x86_64 Linux hosts.
+[tool.uv]
+required-environments = [
+    "sys_platform == 'linux' and platform_machine == 'x86_64'",
+]
+# flash-attn must be built against an already-installed torch.  Disabling
+# build isolation lets its setup.py see torch from .venv during compilation.
+no-build-isolation-package = ["flash-attn"]
