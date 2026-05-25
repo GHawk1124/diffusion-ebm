@@ -8,13 +8,25 @@ wheels/
 
 # Virtual environments
 .venv
+.envrc
 
-# Notebook checkpoints
+# Notebook/runtime metadata
 .ipynb_checkpoints/
+__marimo__/
 
-# Project artefacts
-plots/
-results/
+# Result artefacts
+plots/*
+!plots/*.png
+results/*
+!results/results.json
+!results/results_all.json
+!results/m5c_smoke/
+results/m5c_smoke/*
+!results/m5c_smoke/log.json
+
+# Local planning and cluster submit files
+.claude/
+slurm/
 
 # Hugging Face cache (if user puts it inside repo)
 .hf_cache/
@@ -23,3 +35,7 @@ results/
 .direnv/
 result
 result-*
+
+# Apptainer / Singularity images (only the .def file is checked in)
+*.sif
+*.img

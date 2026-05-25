@@ -84,9 +84,162 @@ def repeat3_template(tokenizer) -> MultiHoleInstance:
     )
 
 
-def all_templates(tokenizer) -> list[MultiHoleInstance]:
-    return [
-        color_template(tokenizer),
-        variable_template(tokenizer),
-        repeat3_template(tokenizer),
-    ]
+def distance_template(tokenizer) -> MultiHoleInstance:
+    """Long-context equality (M5b). Same constraint as `color_template`, but
+    with an 80-ish-token distractor paragraph between the two holes — tests
+    whether attention preserves the equality signal across distance.
+    """
+    distractor = (
+        " The weather that morning was unusually mild. A light breeze stirred"
+        " the curtains, and somewhere in the next room a clock ticked steadily."
+        " Neither of them spoke for a long while; the silence felt comfortable"
+        " rather than awkward, and the coffee on the table had gone cold."
+    )
+    masked_input_ids, mask_positions = _build(
+        tokenizer,
+        [
+            "Alice's favorite color is",
+            "." + distractor + " Bob's favorite color is also",
+            ".",
+        ],
+    )
+    return MultiHoleInstance(
+        text="Alice's favorite color is [M]. <80-token distractor>. Bob's favorite color is also [M].",
+        masked_input_ids=masked_input_ids,
+        mask_positions=mask_positions,
+        equality_groups=[mask_positions],
+    )
+
+
+def many_holes_template(tokenizer) -> MultiHoleInstance:
+    """Four equality holes in tight quarters (M5b). Stress-tests the
+    equality factor when the joint state space is k^4. mask-predict can
+    cascade-commit since adjacent context is informative once one hole is
+    fixed; THRML must explore the full joint.
+    """
+    masked_input_ids, mask_positions = _build(
+        tokenizer,
+        [
+            "Whenever",
+            " walked into the room,",
+            " smiled politely. Then",
+            " sat down beside",
+            " quietly.",
+        ],
+    )
+    return MultiHoleInstance(
+        text="Whenever [M] walked into the room, [M] smiled politely. Then [M] sat down beside [M] quietly.",
+        masked_input_ids=masked_input_ids,
+        mask_positions=mask_positions,
+        equality_groups=[mask_positions],
+    )
+
+
+def multi_group_template(tokenizer) -> MultiHoleInstance:
+    """Two distinct equality groups in one prompt (M5b). Group A spans the
+    name slots; group B spans the city slots. mask-predict must satisfy both
+    constraints jointly without seeing them as separate; the joint sampler
+    sees both as factors.
+    """
+    masked_input_ids, mask_positions = _build(
+        tokenizer,
+        [
+            "The author",
+            " was born in",
+            ", and years later, when",
+            " returned to",
+            ", the city had changed.",
+        ],
+    )
+    # Holes (in order): name1, city1, name2, city2.
+    return MultiHoleInstance(
+        text="The author [M_a] was born in [M_b], and years later, when [M_a] returned to [M_b], the city had changed.",
+        masked_input_ids=masked_input_ids,
+        mask_positions=mask_positions,
+        equality_groups=[
+            [mask_positions[0], mask_positions[2]],  # name group
+            [mask_positions[1], mask_positions[3]],  # city group
+        ],
+    )
+
+
+def distractor_template(tokenizer) -> MultiHoleInstance:
+    """Leading prefix biases per-hole conditional toward a specific token
+    (M5b). The mask_predict argmax is likely to pick the prefix-matching
+    token at both held holes, trivially "agreeing" but on a token chosen
+    by the misleading context — not the joint optimum given the *equality*
+    constraint between the *latter two* holes.
+
+    Equality group: only the two later holes (Bob's, Carol's). Alice's
+    color is fixed surface text in a separate (singleton) group.
+    """
+    masked_input_ids, mask_positions = _build(
+        tokenizer,
+        [
+            "Alice's favorite color is red. Bob's favorite color is",
+            ". Carol's favorite color is also",
+            ".",
+        ],
+    )
+    return MultiHoleInstance(
+        text="Alice's favorite color is red. Bob's favorite color is [M]. Carol's favorite color is also [M].",
+        masked_input_ids=masked_input_ids,
+        mask_positions=mask_positions,
+        equality_groups=[mask_positions],
+    )
+
+
+def polyseme_template(tokenizer) -> MultiHoleInstance:
+    """Polyseme/homonym intersection (M5b, brainstorm-derived). The local
+    LM mode at hole 1 ("trunk") differs from the local mode at hole 2
+    ("shoe"), but both contexts admit a single shared token ("boot"). A
+    joint sampler with an equality factor finds "boot"; mask-predict at
+    T=0 commits each hole to its local argmax and produces an
+    inconsistent fill.
+    """
+    masked_input_ids, mask_positions = _build(
+        tokenizer,
+        [
+            "She packed her bag into the car's",
+            ", then put a sturdy leather",
+            " on her foot.",
+        ],
+    )
+    return MultiHoleInstance(
+        text="She packed her bag into the car's [M], then put a sturdy leather [M] on her foot.",
+        masked_input_ids=masked_input_ids,
+        mask_positions=mask_positions,
+        equality_groups=[mask_positions],
+    )
+
+
+_CORE = (color_template, variable_template, repeat3_template)
+_M5B = (
+    distance_template,
+    many_holes_template,
+    multi_group_template,
+    distractor_template,
+    polyseme_template,
+)
+
+
+def all_templates(
+    tokenizer, family: str | None = None
+) -> list[MultiHoleInstance]:
+    """Build templates for the requested family.
+
+    ``family`` ∈ {None, 'core', 'm5b', 'all'}. ``None`` and ``'core'``
+    return the original three M3 templates so existing callers keep
+    working. ``'m5b'`` returns the five new boundary-probing templates;
+    ``'all'`` returns both.
+    """
+    fam = family or "core"
+    if fam == "core":
+        builders = _CORE
+    elif fam == "m5b":
+        builders = _M5B
+    elif fam == "all":
+        builders = _CORE + _M5B
+    else:
+        raise ValueError(f"unknown family {family!r}")
+    return [b(tokenizer) for b in builders]

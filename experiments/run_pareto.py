@@ -86,9 +86,6 @@ def _score(
     return agree, ppl
 
 
-# ---------------- method runners --------------------------------------------
-
-
 def _run_thrml(
     mdlm: MDLM,
     instance: MultiHoleInstance,
@@ -148,6 +145,20 @@ def _run_ancestral_topk(
     return samples, 1, 0
 
 
+def _run_ancestral_topk_iterative(
+    mdlm: MDLM,
+    instance: MultiHoleInstance,
+    cfg: dict,
+    seed: int,
+) -> tuple[torch.Tensor, int, int]:
+    k = int(cfg["k"])
+    n_iters = int(cfg["n_iters"])
+    samples = baselines.ancestral_topk_iterative(
+        mdlm, instance, k=k, n_iters=n_iters, n_chains=N_CHAINS, seed=seed
+    )
+    return samples, n_iters, 0
+
+
 def _run_independent_full(
     mdlm: MDLM,
     instance: MultiHoleInstance,
@@ -167,11 +178,9 @@ RUNNERS: dict[str, Runner] = {
     "thrml_joint": _run_thrml,
     "mask_predict": _run_mask_predict,
     "ancestral_topk": _run_ancestral_topk,
+    "ancestral_topk_iterative": _run_ancestral_topk_iterative,
     "independent_full": _run_independent_full,
 }
-
-
-# ---------------- grid -------------------------------------------------------
 
 
 def _full_grid() -> dict[str, list[dict]]:
@@ -189,12 +198,17 @@ def _full_grid() -> dict[str, list[dict]]:
             mask.append({"n_iters": n_iters, "temperature": temp})
 
     ancestral = [{"k": 32}, {"k": 64}]
+    ancestral_iter: list[dict] = []
+    for n_iters in (1, 2, 3):
+        for kk in (32, 64):
+            ancestral_iter.append({"n_iters": n_iters, "k": kk})
     indep: list[dict] = [{}]
 
     return {
         "thrml_joint": thrml,
         "mask_predict": mask,
         "ancestral_topk": ancestral,
+        "ancestral_topk_iterative": ancestral_iter,
         "independent_full": indep,
     }
 
@@ -204,17 +218,21 @@ def _quick_grid() -> dict[str, list[dict]]:
         "thrml_joint": [{"gibbs_sweeps": 200, "equality_weight": 5.0, "k": 64}],
         "mask_predict": [{"n_iters": 4, "temperature": 1.0}],
         "ancestral_topk": [{"k": 64}],
+        "ancestral_topk_iterative": [{"n_iters": 2, "k": 64}, {"n_iters": 3, "k": 64}],
         "independent_full": [{}],
     }
-
-
-# ---------------- main -------------------------------------------------------
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="M4 Pareto sweep driver")
     parser.add_argument("--quick", action="store_true")
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument(
+        "--templates",
+        choices=("core", "m5b", "all"),
+        default="core",
+        help="template family to sweep (M5b adds boundary-probing prompts)",
+    )
     parser.add_argument(
         "--out", type=str, default=os.path.join(_REPO_ROOT, "results/results.json")
     )
@@ -223,14 +241,17 @@ def main() -> int:
     torch.manual_seed(args.seed)
     grid = _quick_grid() if args.quick else _full_grid()
 
-    n_runs = sum(len(v) for v in grid.values()) * 3  # 3 templates
-    print(f"[pareto] grid: {n_runs} runs, quick={args.quick}, seed={args.seed}")
-
     mdlm = MDLM.load()
     print(f"[pareto] MDLM on {mdlm.device}")
 
+    templates = all_templates(mdlm.tokenizer, family=args.templates)
+    n_runs = sum(len(v) for v in grid.values()) * len(templates)
+    print(
+        f"[pareto] grid: {n_runs} runs, templates={args.templates} "
+        f"({len(templates)} prompts), quick={args.quick}, seed={args.seed}"
+    )
+
     records: list[dict[str, Any]] = []
-    templates = all_templates(mdlm.tokenizer)
     t_total0 = time.time()
 
     for instance in templates:

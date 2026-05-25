@@ -70,10 +70,92 @@
           '';
           runScript = "bash";
         };
+        # `nix run .#tour` — open the marimo project tour in a browser.
+        # Resolves the project root via git so the command works from any
+        # subdirectory of the checkout.
+        tourScript = pkgs.writeShellScript "diffusion-ebm-tour" ''
+          set -euo pipefail
+          ROOT="$(${pkgs.git}/bin/git rev-parse --show-toplevel 2>/dev/null || pwd)"
+          cd "$ROOT"
+          exec ${fhs}/bin/diffusion-ebm -c \
+            "uv run marimo edit notebooks/08_tour_marimo.py"
+        '';
+
+        # `nix run .#build-apptainer-image` — produce a ready-to-run .sif from
+        # container/diffusion-ebm.def.  Uses --fakeroot so the build doesn't
+        # need root, but does require subuid/subgid mapping for $USER (NixOS
+        # users.users.<name>.subUidRanges / .subGidRanges in configuration.nix
+        # if not already configured).  ~15–20 min on first build because
+        # flash-attn is compiled inside the image for sm_80/8.9/9.0.
+        buildApptainerScript = pkgs.writeShellApplication {
+          name = "diffusion-ebm-build-apptainer";
+          runtimeInputs = [ pkgs.apptainer pkgs.git pkgs.coreutils ];
+          text = ''
+            set -euo pipefail
+
+            ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+            cd "$ROOT"
+
+            OUTPUT="''${1:-diffusion-ebm.sif}"
+            DEF="$ROOT/container/diffusion-ebm.def"
+
+            if [ ! -f "$DEF" ]; then
+              echo "error: missing $DEF" >&2
+              exit 1
+            fi
+
+            if ! grep -q "^$USER:" /etc/subuid 2>/dev/null; then
+              echo "warning: $USER is not in /etc/subuid." >&2
+              echo "  rootless --fakeroot will likely fail.  fixes:" >&2
+              echo "    (NixOS) users.users.$USER.subUidRanges = [{ startUid = 100000; count = 65536; }];" >&2
+              echo "    (any)   sudo usermod --add-subuids 100000-165535 --add-subgids 100000-165535 $USER" >&2
+              echo "    (or)    copy $DEF to the cluster login node and build there." >&2
+            fi
+
+            echo ":: writing $OUTPUT (expect ~15-20 min for the first build)"
+            apptainer build --fakeroot --force "$OUTPUT" "$DEF"
+
+            echo
+            echo ":: image built: $OUTPUT"
+            SIZE=$(du -h "$OUTPUT" | cut -f1)
+            echo ":: size: $SIZE"
+            echo
+            echo ":: smoke-test locally (needs an NVIDIA GPU on the host):"
+            echo "     nix run .#apptainer -- run --nv $OUTPUT python notebooks/00_smoke.py"
+            echo ":: transfer to cluster:"
+            echo "     scp $OUTPUT <cluster>:~/"
+          '';
+        };
       in {
         devShells.default = fhs.env;
 
         # Convenience aliases.
         devShells.fhs = fhs.env;
+
+        apps.tour = {
+          type = "app";
+          program = toString tourScript;
+        };
+
+        apps.build-apptainer-image = {
+          type = "app";
+          program = "${buildApptainerScript}/bin/diffusion-ebm-build-apptainer";
+        };
+
+        # `nix run .#apptainer -- <args>` — direct apptainer pass-through so
+        # the user can `apptainer run --nv ./diffusion-ebm.sif ...`,
+        # `apptainer shell --nv ...`, `apptainer inspect ...` etc. without
+        # putting apptainer into the FHS dev shell (where it would conflict
+        # with the FHS chroot machinery).
+        apps.apptainer = {
+          type = "app";
+          program = "${pkgs.apptainer}/bin/apptainer";
+        };
+
+        # `nix build .#apptainer-def` — exposes the def file as a flake
+        # output for reproducibility / CI consumption.
+        packages.apptainer-def = pkgs.runCommand "diffusion-ebm.def" { } ''
+          cp ${./container/diffusion-ebm.def} $out
+        '';
       });
 }

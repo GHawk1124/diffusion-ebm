@@ -63,14 +63,23 @@ def lm_perplexity(
     filled = instance.masked_input_ids.to(dtype=torch.long).unsqueeze(0).repeat(n_chains, 1)
     filled[:, instance.mask_positions] = samples.to(dtype=torch.long)
 
-    logits = mdlm.forward(filled).float()
-    logits[..., MASK_TOKEN_ID] = -float("inf")
-    log_probs = F.log_softmax(logits, dim=-1)
-
-    positions = torch.tensor(instance.mask_positions, device=log_probs.device)
-    filled = filled.to(log_probs.device)
-    targets = filled[:, positions].unsqueeze(-1)
-    logp = log_probs[:, positions, :].gather(dim=-1, index=targets).squeeze(-1)
-    mean_neg_logp_per_chain = -logp.mean(dim=-1)
+    # Chunk the forward to keep peak memory bounded — the M5b distance
+    # template is 69 tokens long and full-batch [64, 69, 50258] float32
+    # logits OOM on a small GPU.
+    chunk = 8
+    out_chunks: list[torch.Tensor] = []
+    positions = torch.tensor(instance.mask_positions)
+    for s in range(0, n_chains, chunk):
+        sub = filled[s : s + chunk]
+        logits = mdlm.forward(sub).float()
+        logits[..., MASK_TOKEN_ID] = -float("inf")
+        log_probs = F.log_softmax(logits, dim=-1)
+        sub_positions = positions.to(log_probs.device)
+        sub_dev = sub.to(log_probs.device)
+        targets = sub_dev[:, sub_positions].unsqueeze(-1)
+        logp = log_probs[:, sub_positions, :].gather(dim=-1, index=targets).squeeze(-1)
+        out_chunks.append((-logp.mean(dim=-1)).cpu())
+        del logits, log_probs, logp
+    mean_neg_logp_per_chain = torch.cat(out_chunks, dim=0)
     ppl = torch.exp(mean_neg_logp_per_chain)
-    return ppl.cpu()
+    return ppl

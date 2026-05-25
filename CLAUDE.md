@@ -111,7 +111,7 @@ diffusion-ebm/
   results/                     # gitignored
 ```
 
-## Status (2026-05-08)
+## Status (2026-05-08, M5a + M5b complete; M5c prepped, awaits A100 day)
 
 - [x] **M0** — project skeleton, env install, smoke test (PASS).
 - [x] **M1** — Potts chain MVP0 (PASS: independent 0/500 fully aligned;
@@ -138,6 +138,56 @@ diffusion-ebm/
       at 1 LM forward vs 0.33 (T=0) / 0.15 (T=1) for mask-predict at
       64 LM forwards. See `plots/{headline,pareto_flops,tsu_cost}.png`,
       `results/results.json`, and `README.md`).
+- [x] **M5a** — strengthened iterative top-k baseline (PASS: 123-run
+      sweep, ~2 min total. New `ancestral_topk_iterative` commits the
+      most-confident hole per chain per iteration so subsequent
+      forwards see real context. On *color* it lifts agreement
+      0.000 → 0.469 at 2 LM forwards; on *variable* 0.016 → 0.047; on
+      *repeat-3* it stays at 0.000. Still well below `mask_predict@T=0`
+      on color (0.469 vs 1.000 @ 4 LM) and never beats THRML on any
+      template. M4 headline survives the strengthening.
+      `experiments/verify_m5a.py` covers the n_iters=1 distributional
+      sanity check (top-3 token overlap, since MDLM bf16 attention
+      shifts logits ~0.5 max between batch_size=1 and batch_size=64,
+      making exact KL-match unreachable).
+- [x] **M5b** — boundary templates (PASS: 328-run sweep across 8
+      families, ~6 min total. Five new families
+      (distance/many-holes/multi-group/distractor/polyseme) plus the
+      original 3 core templates. THRML averages **0.80** agreement
+      across the five M5b families at 1 LM forward vs 0.40 (T=0) /
+      0.28 (T=1) for mask-predict at any budget; bimodal headline.
+      THRML wins by ≥ 0.3 on variable, repeat-3, multi-group,
+      polyseme; ties (≤ 0.1) on color, distance, distractor — all
+      "favorite color is"-style cascadable templates where mp@T=0
+      free-rides committed-argmax. The **many-holes** template is
+      degenerate (all methods 0.000) because top-64 candidate sets at
+      4 different syntactic roles share no common token — a property
+      of the top-k state space, not the joint sampler. See
+      `notebooks/05_boundary.py`, `plots/m5b_{headline,boundary}.png`,
+      `results/results_all.json`. Required chunking
+      `lm_perplexity` and the baseline forwards (16 chains/chunk) so
+      the longer distance template did not OOM the 8 GB GPU.
+- [~] **M5c** — learned EBM correction, **scaffolded and smoke-tested,
+      awaits the A100 day**. Decision matrix locked in: objective =
+      Joint-Transition NCE (positives are corpus pairs, negatives are
+      independent top-k LM-marginal samples at each masked position);
+      encoder = MDLM last hidden state via the new
+      `MDLM.forward_hidden`; corpus = OpenWebText (HF streaming);
+      eval primary = M5b distractor + polyseme. Files:
+      `src/diffusion_ebm/factors/learned.py` (PairwiseScorer with
+      bilinear factorisation `⟨f(h_a, x_i), g(h_b, x_j)⟩` so a full
+      [k, k] pair table is two MLP forwards + one matmul);
+      `src/diffusion_ebm/sampler/thrml_joint_learned.py` (parallel of
+      `thrml_joint.build` swapping the equality table for the learned
+      one); `experiments/m5c_train.py` (data + InfoNCE loop);
+      `experiments/m5c_smoke.py` (300-step synthetic run + eval on
+      color + polyseme; passes locally, 6.3 s); `experiments/m5c_eval.py`
+      (M5b sweep with a trained checkpoint); `notebooks/06_learned.py`
+      (overlay plot vs M5b boundary). Codex review caught one
+      load-bearing bug — `(ids, unary)` swap from `top_k_candidates`
+      in both smoke and eval — now fixed; smoke re-passes. The A100
+      day plan is in `A100_RUNBOOK.md` (≈ 1 h setup, 18 h training,
+      4 h eval).
 
 ## Environment quirks (NixOS-specific, **important**)
 

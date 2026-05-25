@@ -1,0 +1,174 @@
+Bootstrap: docker
+From: nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
+
+# Apptainer definition for CUDA 12.4 hosts with apptainer and the
+# NVIDIA driver available on the host.
+#
+# Build (from repo root, host needs subuid mapping for --fakeroot):
+#     nix run .#build-apptainer-image
+#         # or directly:
+#     apptainer build --fakeroot diffusion-ebm.sif container/diffusion-ebm.def
+#
+# Run (cluster, --nv mounts the host driver libs):
+#     apptainer run --nv diffusion-ebm.sif python experiments/m5c_smoke.py
+#     apptainer run --nv --bind $PWD/results:/opt/diffusion-ebm/results \
+#         diffusion-ebm.sif python experiments/m5c_train.py --corpus owt ...
+#
+# The image bakes in: python 3.12, torch 2.6.0+cu124, flash-attn (compiled
+# for sm_80/8.9/9.0 — A100 / Ada / H100), jax-cuda12, thrml, the project
+# source, and the MDLM-owt checkpoint.  No `uv sync` on the rental clock.
+
+%files
+    pyproject.toml /opt/diffusion-ebm/pyproject.toml
+    uv.lock /opt/diffusion-ebm/uv.lock
+    README.md /opt/diffusion-ebm/README.md
+    CLAUDE.md /opt/diffusion-ebm/CLAUDE.md
+    src /opt/diffusion-ebm/src
+    experiments /opt/diffusion-ebm/experiments
+    notebooks /opt/diffusion-ebm/notebooks
+
+%post
+    set -eux
+    export DEBIAN_FRONTEND=noninteractive
+
+    # System packages.
+    apt-get update
+    apt-get install -y --no-install-recommends \
+        software-properties-common \
+        ca-certificates curl git \
+        build-essential ninja-build
+    add-apt-repository -y ppa:deadsnakes/ppa
+    apt-get update
+    apt-get install -y --no-install-recommends \
+        python3.12 python3.12-venv python3.12-dev
+    apt-get clean
+    rm -rf /var/lib/apt/lists/*
+
+    # Install uv to /usr/local/bin so it is on PATH during build and runtime.
+    curl -LsSf https://astral.sh/uv/install.sh \
+        | env UV_INSTALL_DIR=/usr/local/bin INSTALLER_NO_MODIFY_PATH=1 sh
+
+    # Build the project environment.
+    cd /opt/diffusion-ebm
+
+    # CUDA arch list controls which compute capabilities flash-attn gets
+    # compiled for. 8.0 = A100, 8.9 = Ada (RTX 3000), 9.0 = H100.  Override
+    # by passing `--env TORCH_CUDA_ARCH_LIST=...` to apptainer build, or by
+    # editing this line.
+    export TORCH_CUDA_ARCH_LIST="${TORCH_CUDA_ARCH_LIST:-8.0;8.9;9.0}"
+
+    # Each flash-attn translation unit can spike to ~10 GB of RAM.  MAX_JOBS=2
+    # keeps the build under ~20 GB on most hosts.
+    export MAX_JOBS="${MAX_JOBS:-2}"
+
+    export CUDA_HOME=/usr/local/cuda
+    export CUDA_PATH=/usr/local/cuda
+    export PATH=/usr/local/cuda/bin:/usr/local/bin:$PATH
+    export UV_PROJECT_ENVIRONMENT=/opt/diffusion-ebm/.venv
+    export UV_PYTHON=python3.12
+
+    # --frozen makes the build fail loudly if uv.lock drifted from pyproject.
+    # --no-dev keeps Jupyter / marimo dev extras out of the runtime image.
+    uv sync --frozen --no-dev
+
+    # Import smoke-test; GPU access is checked at runtime.
+    /opt/diffusion-ebm/.venv/bin/python - <<'PY'
+import torch, thrml, jax, transformers, flash_attn, einops, networkx
+print("torch     :", torch.__version__)
+print("flash-attn:", flash_attn.__version__)
+print("thrml     :", thrml.__version__)
+print("jax       :", jax.__version__)
+print("transforms:", transformers.__version__)
+PY
+
+    # Pre-fetch model weights into the image.
+    # MDLM + GPT-2 tokenizer.  ~500 MB on disk.  Saves the first-run download
+    # off the rental clock and makes the image fully self-contained for
+    # offline reproduction.  Stored at a fixed path so HF_HOME defaults work.
+    export HF_HOME=/opt/diffusion-ebm/.hf_cache
+    /opt/diffusion-ebm/.venv/bin/python - <<'PY'
+from huggingface_hub import snapshot_download
+snapshot_download(
+    "kuleshov-group/mdlm-owt",
+    allow_patterns=["*.bin", "*.safetensors", "*.json", "*.txt", "*.py"],
+)
+snapshot_download(
+    "gpt2",
+    allow_patterns=["*.json", "*.txt", "vocab.bpe", "merges.txt"],
+)
+print("hf cache populated at", "/opt/diffusion-ebm/.hf_cache")
+PY
+
+    # Slim down build caches.
+    rm -rf /root/.cache/uv /root/.cache/pip /tmp/* /var/tmp/* || true
+    find /opt/diffusion-ebm/.venv -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
+
+%environment
+    # Put the project venv first on PATH; CUDA toolkit second so nvcc is
+    # still reachable for in-container debugging (e.g. cuda-gdb sessions).
+    export PATH=/opt/diffusion-ebm/.venv/bin:/usr/local/cuda/bin:/usr/local/bin:$PATH
+
+    export PYTHONPATH=/opt/diffusion-ebm/src
+    export CUDA_HOME=/usr/local/cuda
+    export CUDA_PATH=/usr/local/cuda
+
+    # Triton's NVIDIA backend probes /sbin/ldconfig to find libcuda.so. With
+    # `apptainer --nv` the host driver libs land at /usr/lib/x86_64-linux-gnu;
+    # point Triton straight at them so it skips ldconfig.
+    export TRITON_LIBCUDA_PATH=/usr/lib/x86_64-linux-gnu
+
+    # HF cache pre-baked into the image; override with --env HF_HOME=... at
+    # runtime to redirect to faster scratch storage.
+    export HF_HOME=${HF_HOME:-/opt/diffusion-ebm/.hf_cache}
+    export HF_HUB_CACHE=${HF_HUB_CACHE:-$HF_HOME/hub}
+
+%runscript
+    cd /opt/diffusion-ebm
+    exec "$@"
+
+%startscript
+    cd /opt/diffusion-ebm
+    exec "$@"
+
+%test
+    /opt/diffusion-ebm/.venv/bin/python -c "import torch, flash_attn, thrml, jax; print('imports ok')"
+
+%help
+    diffusion-ebm — pretrained MDLM + THRML factor graph sampler.
+
+    Quick start (on the cluster, --nv binds the host NVIDIA driver):
+
+        # Smoke (CPU+GPU import check, no LM forward).
+        apptainer run --nv diffusion-ebm.sif python notebooks/00_smoke.py
+
+        # M5c smoke (1 min).
+        apptainer run --nv diffusion-ebm.sif python experiments/m5c_smoke.py
+
+        # M5c full training (the headline run).
+        apptainer run --nv \
+            --bind $PWD/results:/opt/diffusion-ebm/results \
+            diffusion-ebm.sif \
+            python experiments/m5c_train.py \
+              --corpus owt --steps 200000 --batch 256 --neg-k 16 \
+              --top-k 64 --seq-len 64 --min-pair-dist 4 \
+              --lr 3e-4 --wd 0.01 \
+              --embed-dim 256 --head-dim 128 --mlp-dim 1024 \
+              --log-every 200 --ckpt-every 5000 \
+              --ckpt-dir results/m5c
+
+        # Interactive shell (useful for `nvidia-smi`, ad-hoc python REPL).
+        apptainer shell --nv diffusion-ebm.sif
+
+    Recommended bind-mounts on slurm clusters with /scratch:
+
+        --bind /scratch/$USER:/scratch
+        --bind $PWD/results:/opt/diffusion-ebm/results
+        --bind $PWD/plots:/opt/diffusion-ebm/plots
+        --env HF_HOME=/scratch/$USER/hf_cache
+
+%labels
+    org.opencontainers.image.source         diffusion-ebm
+    org.opencontainers.image.description    "MDLM + THRML factor graph sampler (M5c-ready)"
+    cuda                                    12.4.1
+    pytorch                                 2.6.0+cu124
+    torch_cuda_arch_list                    "8.0;8.9;9.0"

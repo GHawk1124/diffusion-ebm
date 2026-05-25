@@ -1,0 +1,1904 @@
+[
+  {
+    "template": "Alice's favorite color is [M]. Bob's favorite color is also [M].",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 10,
+      "equality_weight": 2.0,
+      "k": 32
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 74,
+    "n_chains": 64,
+    "agreement_rate": 0.234375,
+    "lm_perplexity_mean": 1.003919005393982,
+    "wall_time_s": 3.002913236618042,
+    "seed": 0
+  },
+  {
+    "template": "Alice's favorite color is [M]. Bob's favorite color is also [M].",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 10,
+      "equality_weight": 2.0,
+      "k": 64
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 74,
+    "n_chains": 64,
+    "agreement_rate": 0.15625,
+    "lm_perplexity_mean": 1.0066721439361572,
+    "wall_time_s": 1.5341262817382812,
+    "seed": 0
+  },
+  {
+    "template": "Alice's favorite color is [M]. Bob's favorite color is also [M].",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 10,
+      "equality_weight": 5.0,
+      "k": 32
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 74,
+    "n_chains": 64,
+    "agreement_rate": 0.828125,
+    "lm_perplexity_mean": 1.0030126571655273,
+    "wall_time_s": 1.2383160591125488,
+    "seed": 0
+  },
+  {
+    "template": "Alice's favorite color is [M]. Bob's favorite color is also [M].",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 10,
+      "equality_weight": 5.0,
+      "k": 64
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 74,
+    "n_chains": 64,
+    "agreement_rate": 0.75,
+    "lm_perplexity_mean": 1.005165696144104,
+    "wall_time_s": 1.1847214698791504,
+    "seed": 0
+  },
+  {
+    "template": "Alice's favorite color is [M]. Bob's favorite color is also [M].",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 10,
+      "equality_weight": 10.0,
+      "k": 32
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 74,
+    "n_chains": 64,
+    "agreement_rate": 1.0,
+    "lm_perplexity_mean": 1.0001932382583618,
+    "wall_time_s": 1.276031732559204,
+    "seed": 0
+  },
+  {
+    "template": "Alice's favorite color is [M]. Bob's favorite color is also [M].",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 10,
+      "equality_weight": 10.0,
+      "k": 64
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 74,
+    "n_chains": 64,
+    "agreement_rate": 1.0,
+    "lm_perplexity_mean": 1.0001932382583618,
+    "wall_time_s": 1.2637853622436523,
+    "seed": 0
+  },
+  {
+    "template": "Alice's favorite color is [M]. Bob's favorite color is also [M].",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 50,
+      "equality_weight": 2.0,
+      "k": 32
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 114,
+    "n_chains": 64,
+    "agreement_rate": 0.234375,
+    "lm_perplexity_mean": 1.003919005393982,
+    "wall_time_s": 1.353351354598999,
+    "seed": 0
+  },
+  {
+    "template": "Alice's favorite color is [M]. Bob's favorite color is also [M].",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 50,
+      "equality_weight": 2.0,
+      "k": 64
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 114,
+    "n_chains": 64,
+    "agreement_rate": 0.15625,
+    "lm_perplexity_mean": 1.0066702365875244,
+    "wall_time_s": 1.2197225093841553,
+    "seed": 0
+  },
+  {
+    "template": "Alice's favorite color is [M]. Bob's favorite color is also [M].",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 50,
+      "equality_weight": 5.0,
+      "k": 32
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 114,
+    "n_chains": 64,
+    "agreement_rate": 0.8125,
+    "lm_perplexity_mean": 1.003015160560608,
+    "wall_time_s": 1.3049142360687256,
+    "seed": 0
+  },
+  {
+    "template": "Alice's favorite color is [M]. Bob's favorite color is also [M].",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 50,
+      "equality_weight": 5.0,
+      "k": 64
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 114,
+    "n_chains": 64,
+    "agreement_rate": 0.734375,
+    "lm_perplexity_mean": 1.0051681995391846,
+    "wall_time_s": 1.2375597953796387,
+    "seed": 0
+  },
+  {
+    "template": "Alice's favorite color is [M]. Bob's favorite color is also [M].",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 50,
+      "equality_weight": 10.0,
+      "k": 32
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 114,
+    "n_chains": 64,
+    "agreement_rate": 1.0,
+    "lm_perplexity_mean": 1.0001932382583618,
+    "wall_time_s": 1.2727718353271484,
+    "seed": 0
+  },
+  {
+    "template": "Alice's favorite color is [M]. Bob's favorite color is also [M].",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 50,
+      "equality_weight": 10.0,
+      "k": 64
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 114,
+    "n_chains": 64,
+    "agreement_rate": 1.0,
+    "lm_perplexity_mean": 1.0001932382583618,
+    "wall_time_s": 1.2429709434509277,
+    "seed": 0
+  },
+  {
+    "template": "Alice's favorite color is [M]. Bob's favorite color is also [M].",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 200,
+      "equality_weight": 2.0,
+      "k": 32
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 264,
+    "n_chains": 64,
+    "agreement_rate": 0.234375,
+    "lm_perplexity_mean": 1.0038920640945435,
+    "wall_time_s": 1.5252797603607178,
+    "seed": 0
+  },
+  {
+    "template": "Alice's favorite color is [M]. Bob's favorite color is also [M].",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 200,
+      "equality_weight": 2.0,
+      "k": 64
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 264,
+    "n_chains": 64,
+    "agreement_rate": 0.15625,
+    "lm_perplexity_mean": 1.0066289901733398,
+    "wall_time_s": 1.226560115814209,
+    "seed": 0
+  },
+  {
+    "template": "Alice's favorite color is [M]. Bob's favorite color is also [M].",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 200,
+      "equality_weight": 5.0,
+      "k": 32
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 264,
+    "n_chains": 64,
+    "agreement_rate": 0.8125,
+    "lm_perplexity_mean": 1.0030677318572998,
+    "wall_time_s": 1.3389418125152588,
+    "seed": 0
+  },
+  {
+    "template": "Alice's favorite color is [M]. Bob's favorite color is also [M].",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 200,
+      "equality_weight": 5.0,
+      "k": 64
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 264,
+    "n_chains": 64,
+    "agreement_rate": 0.75,
+    "lm_perplexity_mean": 1.00520920753479,
+    "wall_time_s": 1.2956008911132812,
+    "seed": 0
+  },
+  {
+    "template": "Alice's favorite color is [M]. Bob's favorite color is also [M].",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 200,
+      "equality_weight": 10.0,
+      "k": 32
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 264,
+    "n_chains": 64,
+    "agreement_rate": 1.0,
+    "lm_perplexity_mean": 1.0001932382583618,
+    "wall_time_s": 1.2722454071044922,
+    "seed": 0
+  },
+  {
+    "template": "Alice's favorite color is [M]. Bob's favorite color is also [M].",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 200,
+      "equality_weight": 10.0,
+      "k": 64
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 264,
+    "n_chains": 64,
+    "agreement_rate": 1.0,
+    "lm_perplexity_mean": 1.0001932382583618,
+    "wall_time_s": 1.2904982566833496,
+    "seed": 0
+  },
+  {
+    "template": "Alice's favorite color is [M]. Bob's favorite color is also [M].",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 1000,
+      "equality_weight": 2.0,
+      "k": 32
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 1064,
+    "n_chains": 64,
+    "agreement_rate": 0.234375,
+    "lm_perplexity_mean": 1.0039523839950562,
+    "wall_time_s": 1.3879809379577637,
+    "seed": 0
+  },
+  {
+    "template": "Alice's favorite color is [M]. Bob's favorite color is also [M].",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 1000,
+      "equality_weight": 2.0,
+      "k": 64
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 1064,
+    "n_chains": 64,
+    "agreement_rate": 0.15625,
+    "lm_perplexity_mean": 1.0066723823547363,
+    "wall_time_s": 1.299177646636963,
+    "seed": 0
+  },
+  {
+    "template": "Alice's favorite color is [M]. Bob's favorite color is also [M].",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 1000,
+      "equality_weight": 5.0,
+      "k": 32
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 1064,
+    "n_chains": 64,
+    "agreement_rate": 0.8125,
+    "lm_perplexity_mean": 1.0030688047409058,
+    "wall_time_s": 1.2931005954742432,
+    "seed": 0
+  },
+  {
+    "template": "Alice's favorite color is [M]. Bob's favorite color is also [M].",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 1000,
+      "equality_weight": 5.0,
+      "k": 64
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 1064,
+    "n_chains": 64,
+    "agreement_rate": 0.734375,
+    "lm_perplexity_mean": 1.0051703453063965,
+    "wall_time_s": 1.4765431880950928,
+    "seed": 0
+  },
+  {
+    "template": "Alice's favorite color is [M]. Bob's favorite color is also [M].",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 1000,
+      "equality_weight": 10.0,
+      "k": 32
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 1064,
+    "n_chains": 64,
+    "agreement_rate": 1.0,
+    "lm_perplexity_mean": 1.000117301940918,
+    "wall_time_s": 1.3604564666748047,
+    "seed": 0
+  },
+  {
+    "template": "Alice's favorite color is [M]. Bob's favorite color is also [M].",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 1000,
+      "equality_weight": 10.0,
+      "k": 64
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 1064,
+    "n_chains": 64,
+    "agreement_rate": 1.0,
+    "lm_perplexity_mean": 1.000117301940918,
+    "wall_time_s": 1.4761936664581299,
+    "seed": 0
+  },
+  {
+    "template": "Alice's favorite color is [M]. Bob's favorite color is also [M].",
+    "method": "mask_predict",
+    "config": {
+      "n_iters": 1,
+      "temperature": 0.0
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 0,
+    "n_chains": 64,
+    "agreement_rate": 0.0,
+    "lm_perplexity_mean": 1.0002079010009766,
+    "wall_time_s": 0.10396265983581543,
+    "seed": 0
+  },
+  {
+    "template": "Alice's favorite color is [M]. Bob's favorite color is also [M].",
+    "method": "mask_predict",
+    "config": {
+      "n_iters": 1,
+      "temperature": 1.0
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 0,
+    "n_chains": 64,
+    "agreement_rate": 0.0625,
+    "lm_perplexity_mean": 1.006595253944397,
+    "wall_time_s": 0.0779275894165039,
+    "seed": 0
+  },
+  {
+    "template": "Alice's favorite color is [M]. Bob's favorite color is also [M].",
+    "method": "mask_predict",
+    "config": {
+      "n_iters": 4,
+      "temperature": 0.0
+    },
+    "n_lm_forwards": 4,
+    "n_gibbs_sweeps": 0,
+    "n_chains": 64,
+    "agreement_rate": 1.0,
+    "lm_perplexity_mean": 1.000117301940918,
+    "wall_time_s": 0.06837034225463867,
+    "seed": 0
+  },
+  {
+    "template": "Alice's favorite color is [M]. Bob's favorite color is also [M].",
+    "method": "mask_predict",
+    "config": {
+      "n_iters": 4,
+      "temperature": 1.0
+    },
+    "n_lm_forwards": 4,
+    "n_gibbs_sweeps": 0,
+    "n_chains": 64,
+    "agreement_rate": 0.421875,
+    "lm_perplexity_mean": 1.0057240724563599,
+    "wall_time_s": 0.07753324508666992,
+    "seed": 0
+  },
+  {
+    "template": "Alice's favorite color is [M]. Bob's favorite color is also [M].",
+    "method": "mask_predict",
+    "config": {
+      "n_iters": 16,
+      "temperature": 0.0
+    },
+    "n_lm_forwards": 16,
+    "n_gibbs_sweeps": 0,
+    "n_chains": 64,
+    "agreement_rate": 1.0,
+    "lm_perplexity_mean": 1.000117301940918,
+    "wall_time_s": 0.06712818145751953,
+    "seed": 0
+  },
+  {
+    "template": "Alice's favorite color is [M]. Bob's favorite color is also [M].",
+    "method": "mask_predict",
+    "config": {
+      "n_iters": 16,
+      "temperature": 1.0
+    },
+    "n_lm_forwards": 16,
+    "n_gibbs_sweeps": 0,
+    "n_chains": 64,
+    "agreement_rate": 0.421875,
+    "lm_perplexity_mean": 1.0057240724563599,
+    "wall_time_s": 0.08018159866333008,
+    "seed": 0
+  },
+  {
+    "template": "Alice's favorite color is [M]. Bob's favorite color is also [M].",
+    "method": "mask_predict",
+    "config": {
+      "n_iters": 64,
+      "temperature": 0.0
+    },
+    "n_lm_forwards": 64,
+    "n_gibbs_sweeps": 0,
+    "n_chains": 64,
+    "agreement_rate": 1.0,
+    "lm_perplexity_mean": 1.000117301940918,
+    "wall_time_s": 0.06749820709228516,
+    "seed": 0
+  },
+  {
+    "template": "Alice's favorite color is [M]. Bob's favorite color is also [M].",
+    "method": "mask_predict",
+    "config": {
+      "n_iters": 64,
+      "temperature": 1.0
+    },
+    "n_lm_forwards": 64,
+    "n_gibbs_sweeps": 0,
+    "n_chains": 64,
+    "agreement_rate": 0.421875,
+    "lm_perplexity_mean": 1.0057240724563599,
+    "wall_time_s": 0.07864522933959961,
+    "seed": 0
+  },
+  {
+    "template": "Alice's favorite color is [M]. Bob's favorite color is also [M].",
+    "method": "ancestral_topk",
+    "config": {
+      "k": 32
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 0,
+    "n_chains": 64,
+    "agreement_rate": 0.0,
+    "lm_perplexity_mean": 1.0092591047286987,
+    "wall_time_s": 0.03544783592224121,
+    "seed": 0
+  },
+  {
+    "template": "Alice's favorite color is [M]. Bob's favorite color is also [M].",
+    "method": "ancestral_topk",
+    "config": {
+      "k": 64
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 0,
+    "n_chains": 64,
+    "agreement_rate": 0.0,
+    "lm_perplexity_mean": 1.0084478855133057,
+    "wall_time_s": 0.03267073631286621,
+    "seed": 0
+  },
+  {
+    "template": "Alice's favorite color is [M]. Bob's favorite color is also [M].",
+    "method": "ancestral_topk_iterative",
+    "config": {
+      "n_iters": 1,
+      "k": 32
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 0,
+    "n_chains": 64,
+    "agreement_rate": 0.046875,
+    "lm_perplexity_mean": 1.0056406259536743,
+    "wall_time_s": 0.04545998573303223,
+    "seed": 0
+  },
+  {
+    "template": "Alice's favorite color is [M]. Bob's favorite color is also [M].",
+    "method": "ancestral_topk_iterative",
+    "config": {
+      "n_iters": 1,
+      "k": 64
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 0,
+    "n_chains": 64,
+    "agreement_rate": 0.0,
+    "lm_perplexity_mean": 1.0127971172332764,
+    "wall_time_s": 0.0455777645111084,
+    "seed": 0
+  },
+  {
+    "template": "Alice's favorite color is [M]. Bob's favorite color is also [M].",
+    "method": "ancestral_topk_iterative",
+    "config": {
+      "n_iters": 2,
+      "k": 32
+    },
+    "n_lm_forwards": 2,
+    "n_gibbs_sweeps": 0,
+    "n_chains": 64,
+    "agreement_rate": 0.46875,
+    "lm_perplexity_mean": 1.004535436630249,
+    "wall_time_s": 0.06447100639343262,
+    "seed": 0
+  },
+  {
+    "template": "Alice's favorite color is [M]. Bob's favorite color is also [M].",
+    "method": "ancestral_topk_iterative",
+    "config": {
+      "n_iters": 2,
+      "k": 64
+    },
+    "n_lm_forwards": 2,
+    "n_gibbs_sweeps": 0,
+    "n_chains": 64,
+    "agreement_rate": 0.40625,
+    "lm_perplexity_mean": 1.0060653686523438,
+    "wall_time_s": 0.06302332878112793,
+    "seed": 0
+  },
+  {
+    "template": "Alice's favorite color is [M]. Bob's favorite color is also [M].",
+    "method": "ancestral_topk_iterative",
+    "config": {
+      "n_iters": 3,
+      "k": 32
+    },
+    "n_lm_forwards": 3,
+    "n_gibbs_sweeps": 0,
+    "n_chains": 64,
+    "agreement_rate": 0.46875,
+    "lm_perplexity_mean": 1.004535436630249,
+    "wall_time_s": 0.06273937225341797,
+    "seed": 0
+  },
+  {
+    "template": "Alice's favorite color is [M]. Bob's favorite color is also [M].",
+    "method": "ancestral_topk_iterative",
+    "config": {
+      "n_iters": 3,
+      "k": 64
+    },
+    "n_lm_forwards": 3,
+    "n_gibbs_sweeps": 0,
+    "n_chains": 64,
+    "agreement_rate": 0.40625,
+    "lm_perplexity_mean": 1.0060653686523438,
+    "wall_time_s": 0.0625295639038086,
+    "seed": 0
+  },
+  {
+    "template": "Alice's favorite color is [M]. Bob's favorite color is also [M].",
+    "method": "independent_full",
+    "config": {},
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 0,
+    "n_chains": 64,
+    "agreement_rate": 0.0,
+    "lm_perplexity_mean": 1.0058619976043701,
+    "wall_time_s": 0.034542083740234375,
+    "seed": 0
+  },
+  {
+    "template": "The variable [M] was assigned the value 7. Later, [M] was used in a loop.",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 10,
+      "equality_weight": 2.0,
+      "k": 32
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 74,
+    "n_chains": 64,
+    "agreement_rate": 0.125,
+    "lm_perplexity_mean": 1.0720856189727783,
+    "wall_time_s": 1.4843873977661133,
+    "seed": 0
+  },
+  {
+    "template": "The variable [M] was assigned the value 7. Later, [M] was used in a loop.",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 10,
+      "equality_weight": 2.0,
+      "k": 64
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 74,
+    "n_chains": 64,
+    "agreement_rate": 0.125,
+    "lm_perplexity_mean": 1.0727540254592896,
+    "wall_time_s": 1.4880521297454834,
+    "seed": 0
+  },
+  {
+    "template": "The variable [M] was assigned the value 7. Later, [M] was used in a loop.",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 10,
+      "equality_weight": 5.0,
+      "k": 32
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 74,
+    "n_chains": 64,
+    "agreement_rate": 0.84375,
+    "lm_perplexity_mean": 1.111603021621704,
+    "wall_time_s": 1.4168784618377686,
+    "seed": 0
+  },
+  {
+    "template": "The variable [M] was assigned the value 7. Later, [M] was used in a loop.",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 10,
+      "equality_weight": 5.0,
+      "k": 64
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 74,
+    "n_chains": 64,
+    "agreement_rate": 0.828125,
+    "lm_perplexity_mean": 1.1112545728683472,
+    "wall_time_s": 1.3195443153381348,
+    "seed": 0
+  },
+  {
+    "template": "The variable [M] was assigned the value 7. Later, [M] was used in a loop.",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 10,
+      "equality_weight": 10.0,
+      "k": 32
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 74,
+    "n_chains": 64,
+    "agreement_rate": 1.0,
+    "lm_perplexity_mean": 1.188929557800293,
+    "wall_time_s": 1.3195552825927734,
+    "seed": 0
+  },
+  {
+    "template": "The variable [M] was assigned the value 7. Later, [M] was used in a loop.",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 10,
+      "equality_weight": 10.0,
+      "k": 64
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 74,
+    "n_chains": 64,
+    "agreement_rate": 1.0,
+    "lm_perplexity_mean": 1.188929557800293,
+    "wall_time_s": 1.2724125385284424,
+    "seed": 0
+  },
+  {
+    "template": "The variable [M] was assigned the value 7. Later, [M] was used in a loop.",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 50,
+      "equality_weight": 2.0,
+      "k": 32
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 114,
+    "n_chains": 64,
+    "agreement_rate": 0.125,
+    "lm_perplexity_mean": 1.0720856189727783,
+    "wall_time_s": 1.3348777294158936,
+    "seed": 0
+  },
+  {
+    "template": "The variable [M] was assigned the value 7. Later, [M] was used in a loop.",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 50,
+      "equality_weight": 2.0,
+      "k": 64
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 114,
+    "n_chains": 64,
+    "agreement_rate": 0.125,
+    "lm_perplexity_mean": 1.0727540254592896,
+    "wall_time_s": 1.3110809326171875,
+    "seed": 0
+  },
+  {
+    "template": "The variable [M] was assigned the value 7. Later, [M] was used in a loop.",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 50,
+      "equality_weight": 5.0,
+      "k": 32
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 114,
+    "n_chains": 64,
+    "agreement_rate": 0.84375,
+    "lm_perplexity_mean": 1.1174342632293701,
+    "wall_time_s": 1.3652918338775635,
+    "seed": 0
+  },
+  {
+    "template": "The variable [M] was assigned the value 7. Later, [M] was used in a loop.",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 50,
+      "equality_weight": 5.0,
+      "k": 64
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 114,
+    "n_chains": 64,
+    "agreement_rate": 0.828125,
+    "lm_perplexity_mean": 1.117085576057434,
+    "wall_time_s": 1.3644609451293945,
+    "seed": 0
+  },
+  {
+    "template": "The variable [M] was assigned the value 7. Later, [M] was used in a loop.",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 50,
+      "equality_weight": 10.0,
+      "k": 32
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 114,
+    "n_chains": 64,
+    "agreement_rate": 1.0,
+    "lm_perplexity_mean": 1.0023354291915894,
+    "wall_time_s": 1.4736342430114746,
+    "seed": 0
+  },
+  {
+    "template": "The variable [M] was assigned the value 7. Later, [M] was used in a loop.",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 50,
+      "equality_weight": 10.0,
+      "k": 64
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 114,
+    "n_chains": 64,
+    "agreement_rate": 1.0,
+    "lm_perplexity_mean": 1.0023354291915894,
+    "wall_time_s": 1.317990779876709,
+    "seed": 0
+  },
+  {
+    "template": "The variable [M] was assigned the value 7. Later, [M] was used in a loop.",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 200,
+      "equality_weight": 2.0,
+      "k": 32
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 264,
+    "n_chains": 64,
+    "agreement_rate": 0.109375,
+    "lm_perplexity_mean": 1.074596881866455,
+    "wall_time_s": 1.3442661762237549,
+    "seed": 0
+  },
+  {
+    "template": "The variable [M] was assigned the value 7. Later, [M] was used in a loop.",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 200,
+      "equality_weight": 2.0,
+      "k": 64
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 264,
+    "n_chains": 64,
+    "agreement_rate": 0.109375,
+    "lm_perplexity_mean": 1.0752654075622559,
+    "wall_time_s": 1.2863667011260986,
+    "seed": 0
+  },
+  {
+    "template": "The variable [M] was assigned the value 7. Later, [M] was used in a loop.",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 200,
+      "equality_weight": 5.0,
+      "k": 32
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 264,
+    "n_chains": 64,
+    "agreement_rate": 0.84375,
+    "lm_perplexity_mean": 1.1174342632293701,
+    "wall_time_s": 1.384831190109253,
+    "seed": 0
+  },
+  {
+    "template": "The variable [M] was assigned the value 7. Later, [M] was used in a loop.",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 200,
+      "equality_weight": 5.0,
+      "k": 64
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 264,
+    "n_chains": 64,
+    "agreement_rate": 0.828125,
+    "lm_perplexity_mean": 1.117085576057434,
+    "wall_time_s": 1.2943646907806396,
+    "seed": 0
+  },
+  {
+    "template": "The variable [M] was assigned the value 7. Later, [M] was used in a loop.",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 200,
+      "equality_weight": 10.0,
+      "k": 32
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 264,
+    "n_chains": 64,
+    "agreement_rate": 1.0,
+    "lm_perplexity_mean": 1.0023354291915894,
+    "wall_time_s": 1.435960054397583,
+    "seed": 0
+  },
+  {
+    "template": "The variable [M] was assigned the value 7. Later, [M] was used in a loop.",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 200,
+      "equality_weight": 10.0,
+      "k": 64
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 264,
+    "n_chains": 64,
+    "agreement_rate": 1.0,
+    "lm_perplexity_mean": 1.0023354291915894,
+    "wall_time_s": 1.301875114440918,
+    "seed": 0
+  },
+  {
+    "template": "The variable [M] was assigned the value 7. Later, [M] was used in a loop.",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 1000,
+      "equality_weight": 2.0,
+      "k": 32
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 1064,
+    "n_chains": 64,
+    "agreement_rate": 0.109375,
+    "lm_perplexity_mean": 1.0737879276275635,
+    "wall_time_s": 1.3317351341247559,
+    "seed": 0
+  },
+  {
+    "template": "The variable [M] was assigned the value 7. Later, [M] was used in a loop.",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 1000,
+      "equality_weight": 2.0,
+      "k": 64
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 1064,
+    "n_chains": 64,
+    "agreement_rate": 0.109375,
+    "lm_perplexity_mean": 1.0744564533233643,
+    "wall_time_s": 1.2697582244873047,
+    "seed": 0
+  },
+  {
+    "template": "The variable [M] was assigned the value 7. Later, [M] was used in a loop.",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 1000,
+      "equality_weight": 5.0,
+      "k": 32
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 1064,
+    "n_chains": 64,
+    "agreement_rate": 0.84375,
+    "lm_perplexity_mean": 1.1174342632293701,
+    "wall_time_s": 1.3149068355560303,
+    "seed": 0
+  },
+  {
+    "template": "The variable [M] was assigned the value 7. Later, [M] was used in a loop.",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 1000,
+      "equality_weight": 5.0,
+      "k": 64
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 1064,
+    "n_chains": 64,
+    "agreement_rate": 0.828125,
+    "lm_perplexity_mean": 1.117085576057434,
+    "wall_time_s": 1.2708349227905273,
+    "seed": 0
+  },
+  {
+    "template": "The variable [M] was assigned the value 7. Later, [M] was used in a loop.",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 1000,
+      "equality_weight": 10.0,
+      "k": 32
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 1064,
+    "n_chains": 64,
+    "agreement_rate": 1.0,
+    "lm_perplexity_mean": 1.0023354291915894,
+    "wall_time_s": 1.3133816719055176,
+    "seed": 0
+  },
+  {
+    "template": "The variable [M] was assigned the value 7. Later, [M] was used in a loop.",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 1000,
+      "equality_weight": 10.0,
+      "k": 64
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 1064,
+    "n_chains": 64,
+    "agreement_rate": 1.0,
+    "lm_perplexity_mean": 1.0023354291915894,
+    "wall_time_s": 1.2611567974090576,
+    "seed": 0
+  },
+  {
+    "template": "The variable [M] was assigned the value 7. Later, [M] was used in a loop.",
+    "method": "mask_predict",
+    "config": {
+      "n_iters": 1,
+      "temperature": 0.0
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 0,
+    "n_chains": 64,
+    "agreement_rate": 0.0,
+    "lm_perplexity_mean": 1.0595256090164185,
+    "wall_time_s": 0.04944157600402832,
+    "seed": 0
+  },
+  {
+    "template": "The variable [M] was assigned the value 7. Later, [M] was used in a loop.",
+    "method": "mask_predict",
+    "config": {
+      "n_iters": 1,
+      "temperature": 1.0
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 0,
+    "n_chains": 64,
+    "agreement_rate": 0.03125,
+    "lm_perplexity_mean": 1.127289056777954,
+    "wall_time_s": 0.054700374603271484,
+    "seed": 0
+  },
+  {
+    "template": "The variable [M] was assigned the value 7. Later, [M] was used in a loop.",
+    "method": "mask_predict",
+    "config": {
+      "n_iters": 4,
+      "temperature": 0.0
+    },
+    "n_lm_forwards": 4,
+    "n_gibbs_sweeps": 0,
+    "n_chains": 64,
+    "agreement_rate": 0.0,
+    "lm_perplexity_mean": 1.0595256090164185,
+    "wall_time_s": 0.07002854347229004,
+    "seed": 0
+  },
+  {
+    "template": "The variable [M] was assigned the value 7. Later, [M] was used in a loop.",
+    "method": "mask_predict",
+    "config": {
+      "n_iters": 4,
+      "temperature": 1.0
+    },
+    "n_lm_forwards": 4,
+    "n_gibbs_sweeps": 0,
+    "n_chains": 64,
+    "agreement_rate": 0.015625,
+    "lm_perplexity_mean": 1.0949950218200684,
+    "wall_time_s": 0.08209562301635742,
+    "seed": 0
+  },
+  {
+    "template": "The variable [M] was assigned the value 7. Later, [M] was used in a loop.",
+    "method": "mask_predict",
+    "config": {
+      "n_iters": 16,
+      "temperature": 0.0
+    },
+    "n_lm_forwards": 16,
+    "n_gibbs_sweeps": 0,
+    "n_chains": 64,
+    "agreement_rate": 0.0,
+    "lm_perplexity_mean": 1.0595256090164185,
+    "wall_time_s": 0.06966972351074219,
+    "seed": 0
+  },
+  {
+    "template": "The variable [M] was assigned the value 7. Later, [M] was used in a loop.",
+    "method": "mask_predict",
+    "config": {
+      "n_iters": 16,
+      "temperature": 1.0
+    },
+    "n_lm_forwards": 16,
+    "n_gibbs_sweeps": 0,
+    "n_chains": 64,
+    "agreement_rate": 0.015625,
+    "lm_perplexity_mean": 1.0949950218200684,
+    "wall_time_s": 0.08414697647094727,
+    "seed": 0
+  },
+  {
+    "template": "The variable [M] was assigned the value 7. Later, [M] was used in a loop.",
+    "method": "mask_predict",
+    "config": {
+      "n_iters": 64,
+      "temperature": 0.0
+    },
+    "n_lm_forwards": 64,
+    "n_gibbs_sweeps": 0,
+    "n_chains": 64,
+    "agreement_rate": 0.0,
+    "lm_perplexity_mean": 1.0595256090164185,
+    "wall_time_s": 0.07013702392578125,
+    "seed": 0
+  },
+  {
+    "template": "The variable [M] was assigned the value 7. Later, [M] was used in a loop.",
+    "method": "mask_predict",
+    "config": {
+      "n_iters": 64,
+      "temperature": 1.0
+    },
+    "n_lm_forwards": 64,
+    "n_gibbs_sweeps": 0,
+    "n_chains": 64,
+    "agreement_rate": 0.015625,
+    "lm_perplexity_mean": 1.0949950218200684,
+    "wall_time_s": 0.08337545394897461,
+    "seed": 0
+  },
+  {
+    "template": "The variable [M] was assigned the value 7. Later, [M] was used in a loop.",
+    "method": "ancestral_topk",
+    "config": {
+      "k": 32
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 0,
+    "n_chains": 64,
+    "agreement_rate": 0.015625,
+    "lm_perplexity_mean": 1.0760198831558228,
+    "wall_time_s": 0.03333902359008789,
+    "seed": 0
+  },
+  {
+    "template": "The variable [M] was assigned the value 7. Later, [M] was used in a loop.",
+    "method": "ancestral_topk",
+    "config": {
+      "k": 64
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 0,
+    "n_chains": 64,
+    "agreement_rate": 0.0,
+    "lm_perplexity_mean": 1.0853564739227295,
+    "wall_time_s": 0.03450417518615723,
+    "seed": 0
+  },
+  {
+    "template": "The variable [M] was assigned the value 7. Later, [M] was used in a loop.",
+    "method": "ancestral_topk_iterative",
+    "config": {
+      "n_iters": 1,
+      "k": 32
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 0,
+    "n_chains": 64,
+    "agreement_rate": 0.0,
+    "lm_perplexity_mean": 1.0820661783218384,
+    "wall_time_s": 0.04355573654174805,
+    "seed": 0
+  },
+  {
+    "template": "The variable [M] was assigned the value 7. Later, [M] was used in a loop.",
+    "method": "ancestral_topk_iterative",
+    "config": {
+      "n_iters": 1,
+      "k": 64
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 0,
+    "n_chains": 64,
+    "agreement_rate": 0.0,
+    "lm_perplexity_mean": 1.069309115409851,
+    "wall_time_s": 0.045485734939575195,
+    "seed": 0
+  },
+  {
+    "template": "The variable [M] was assigned the value 7. Later, [M] was used in a loop.",
+    "method": "ancestral_topk_iterative",
+    "config": {
+      "n_iters": 2,
+      "k": 32
+    },
+    "n_lm_forwards": 2,
+    "n_gibbs_sweeps": 0,
+    "n_chains": 64,
+    "agreement_rate": 0.015625,
+    "lm_perplexity_mean": 1.0804920196533203,
+    "wall_time_s": 0.0687861442565918,
+    "seed": 0
+  },
+  {
+    "template": "The variable [M] was assigned the value 7. Later, [M] was used in a loop.",
+    "method": "ancestral_topk_iterative",
+    "config": {
+      "n_iters": 2,
+      "k": 64
+    },
+    "n_lm_forwards": 2,
+    "n_gibbs_sweeps": 0,
+    "n_chains": 64,
+    "agreement_rate": 0.046875,
+    "lm_perplexity_mean": 1.0739555358886719,
+    "wall_time_s": 0.06742119789123535,
+    "seed": 0
+  },
+  {
+    "template": "The variable [M] was assigned the value 7. Later, [M] was used in a loop.",
+    "method": "ancestral_topk_iterative",
+    "config": {
+      "n_iters": 3,
+      "k": 32
+    },
+    "n_lm_forwards": 3,
+    "n_gibbs_sweeps": 0,
+    "n_chains": 64,
+    "agreement_rate": 0.015625,
+    "lm_perplexity_mean": 1.0804920196533203,
+    "wall_time_s": 0.06844568252563477,
+    "seed": 0
+  },
+  {
+    "template": "The variable [M] was assigned the value 7. Later, [M] was used in a loop.",
+    "method": "ancestral_topk_iterative",
+    "config": {
+      "n_iters": 3,
+      "k": 64
+    },
+    "n_lm_forwards": 3,
+    "n_gibbs_sweeps": 0,
+    "n_chains": 64,
+    "agreement_rate": 0.046875,
+    "lm_perplexity_mean": 1.0739555358886719,
+    "wall_time_s": 0.06836104393005371,
+    "seed": 0
+  },
+  {
+    "template": "The variable [M] was assigned the value 7. Later, [M] was used in a loop.",
+    "method": "independent_full",
+    "config": {},
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 0,
+    "n_chains": 64,
+    "agreement_rate": 0.0,
+    "lm_perplexity_mean": 1.1146979331970215,
+    "wall_time_s": 0.03376364707946777,
+    "seed": 0
+  },
+  {
+    "template": "My name is [M]. You can call me [M]. I said [M] three times.",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 10,
+      "equality_weight": 2.0,
+      "k": 32
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 74,
+    "n_chains": 64,
+    "agreement_rate": 0.046875,
+    "lm_perplexity_mean": 1.0169446468353271,
+    "wall_time_s": 2.219299793243408,
+    "seed": 0
+  },
+  {
+    "template": "My name is [M]. You can call me [M]. I said [M] three times.",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 10,
+      "equality_weight": 2.0,
+      "k": 64
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 74,
+    "n_chains": 64,
+    "agreement_rate": 0.0,
+    "lm_perplexity_mean": 1.0225255489349365,
+    "wall_time_s": 2.0933520793914795,
+    "seed": 0
+  },
+  {
+    "template": "My name is [M]. You can call me [M]. I said [M] three times.",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 10,
+      "equality_weight": 5.0,
+      "k": 32
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 74,
+    "n_chains": 64,
+    "agreement_rate": 0.96875,
+    "lm_perplexity_mean": 1.0000934600830078,
+    "wall_time_s": 1.7927701473236084,
+    "seed": 0
+  },
+  {
+    "template": "My name is [M]. You can call me [M]. I said [M] three times.",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 10,
+      "equality_weight": 5.0,
+      "k": 64
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 74,
+    "n_chains": 64,
+    "agreement_rate": 0.984375,
+    "lm_perplexity_mean": 1.0000758171081543,
+    "wall_time_s": 1.7730920314788818,
+    "seed": 0
+  },
+  {
+    "template": "My name is [M]. You can call me [M]. I said [M] three times.",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 10,
+      "equality_weight": 10.0,
+      "k": 32
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 74,
+    "n_chains": 64,
+    "agreement_rate": 1.0,
+    "lm_perplexity_mean": 1.0000581741333008,
+    "wall_time_s": 1.8156440258026123,
+    "seed": 0
+  },
+  {
+    "template": "My name is [M]. You can call me [M]. I said [M] three times.",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 10,
+      "equality_weight": 10.0,
+      "k": 64
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 74,
+    "n_chains": 64,
+    "agreement_rate": 1.0,
+    "lm_perplexity_mean": 1.0000581741333008,
+    "wall_time_s": 1.7741351127624512,
+    "seed": 0
+  },
+  {
+    "template": "My name is [M]. You can call me [M]. I said [M] three times.",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 50,
+      "equality_weight": 2.0,
+      "k": 32
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 114,
+    "n_chains": 64,
+    "agreement_rate": 0.046875,
+    "lm_perplexity_mean": 1.0172502994537354,
+    "wall_time_s": 1.9416050910949707,
+    "seed": 0
+  },
+  {
+    "template": "My name is [M]. You can call me [M]. I said [M] three times.",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 50,
+      "equality_weight": 2.0,
+      "k": 64
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 114,
+    "n_chains": 64,
+    "agreement_rate": 0.0,
+    "lm_perplexity_mean": 1.0227651596069336,
+    "wall_time_s": 1.7335784435272217,
+    "seed": 0
+  },
+  {
+    "template": "My name is [M]. You can call me [M]. I said [M] three times.",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 50,
+      "equality_weight": 5.0,
+      "k": 32
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 114,
+    "n_chains": 64,
+    "agreement_rate": 0.96875,
+    "lm_perplexity_mean": 1.0000495910644531,
+    "wall_time_s": 1.8480446338653564,
+    "seed": 0
+  },
+  {
+    "template": "My name is [M]. You can call me [M]. I said [M] three times.",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 50,
+      "equality_weight": 5.0,
+      "k": 64
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 114,
+    "n_chains": 64,
+    "agreement_rate": 0.9375,
+    "lm_perplexity_mean": 1.0009021759033203,
+    "wall_time_s": 1.7925472259521484,
+    "seed": 0
+  },
+  {
+    "template": "My name is [M]. You can call me [M]. I said [M] three times.",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 50,
+      "equality_weight": 10.0,
+      "k": 32
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 114,
+    "n_chains": 64,
+    "agreement_rate": 1.0,
+    "lm_perplexity_mean": 1.0000581741333008,
+    "wall_time_s": 1.7830090522766113,
+    "seed": 0
+  },
+  {
+    "template": "My name is [M]. You can call me [M]. I said [M] three times.",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 50,
+      "equality_weight": 10.0,
+      "k": 64
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 114,
+    "n_chains": 64,
+    "agreement_rate": 1.0,
+    "lm_perplexity_mean": 1.0000581741333008,
+    "wall_time_s": 1.7630360126495361,
+    "seed": 0
+  },
+  {
+    "template": "My name is [M]. You can call me [M]. I said [M] three times.",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 200,
+      "equality_weight": 2.0,
+      "k": 32
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 264,
+    "n_chains": 64,
+    "agreement_rate": 0.046875,
+    "lm_perplexity_mean": 1.0172882080078125,
+    "wall_time_s": 1.7905855178833008,
+    "seed": 0
+  },
+  {
+    "template": "My name is [M]. You can call me [M]. I said [M] three times.",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 200,
+      "equality_weight": 2.0,
+      "k": 64
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 264,
+    "n_chains": 64,
+    "agreement_rate": 0.0,
+    "lm_perplexity_mean": 1.0228586196899414,
+    "wall_time_s": 1.8665199279785156,
+    "seed": 0
+  },
+  {
+    "template": "My name is [M]. You can call me [M]. I said [M] three times.",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 200,
+      "equality_weight": 5.0,
+      "k": 32
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 264,
+    "n_chains": 64,
+    "agreement_rate": 0.96875,
+    "lm_perplexity_mean": 1.0000495910644531,
+    "wall_time_s": 2.124086618423462,
+    "seed": 0
+  },
+  {
+    "template": "My name is [M]. You can call me [M]. I said [M] three times.",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 200,
+      "equality_weight": 5.0,
+      "k": 64
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 264,
+    "n_chains": 64,
+    "agreement_rate": 0.9375,
+    "lm_perplexity_mean": 1.0009021759033203,
+    "wall_time_s": 1.9738764762878418,
+    "seed": 0
+  },
+  {
+    "template": "My name is [M]. You can call me [M]. I said [M] three times.",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 200,
+      "equality_weight": 10.0,
+      "k": 32
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 264,
+    "n_chains": 64,
+    "agreement_rate": 1.0,
+    "lm_perplexity_mean": 1.0000581741333008,
+    "wall_time_s": 2.0847601890563965,
+    "seed": 0
+  },
+  {
+    "template": "My name is [M]. You can call me [M]. I said [M] three times.",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 200,
+      "equality_weight": 10.0,
+      "k": 64
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 264,
+    "n_chains": 64,
+    "agreement_rate": 1.0,
+    "lm_perplexity_mean": 1.0000581741333008,
+    "wall_time_s": 1.8065617084503174,
+    "seed": 0
+  },
+  {
+    "template": "My name is [M]. You can call me [M]. I said [M] three times.",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 1000,
+      "equality_weight": 2.0,
+      "k": 32
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 1064,
+    "n_chains": 64,
+    "agreement_rate": 0.046875,
+    "lm_perplexity_mean": 1.0169527530670166,
+    "wall_time_s": 2.0300393104553223,
+    "seed": 0
+  },
+  {
+    "template": "My name is [M]. You can call me [M]. I said [M] three times.",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 1000,
+      "equality_weight": 2.0,
+      "k": 64
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 1064,
+    "n_chains": 64,
+    "agreement_rate": 0.0,
+    "lm_perplexity_mean": 1.0224676132202148,
+    "wall_time_s": 1.9743187427520752,
+    "seed": 0
+  },
+  {
+    "template": "My name is [M]. You can call me [M]. I said [M] three times.",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 1000,
+      "equality_weight": 5.0,
+      "k": 32
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 1064,
+    "n_chains": 64,
+    "agreement_rate": 0.96875,
+    "lm_perplexity_mean": 1.0000495910644531,
+    "wall_time_s": 1.9875872135162354,
+    "seed": 0
+  },
+  {
+    "template": "My name is [M]. You can call me [M]. I said [M] three times.",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 1000,
+      "equality_weight": 5.0,
+      "k": 64
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 1064,
+    "n_chains": 64,
+    "agreement_rate": 0.9375,
+    "lm_perplexity_mean": 1.0009021759033203,
+    "wall_time_s": 1.8057575225830078,
+    "seed": 0
+  },
+  {
+    "template": "My name is [M]. You can call me [M]. I said [M] three times.",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 1000,
+      "equality_weight": 10.0,
+      "k": 32
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 1064,
+    "n_chains": 64,
+    "agreement_rate": 1.0,
+    "lm_perplexity_mean": 1.0000581741333008,
+    "wall_time_s": 1.8095128536224365,
+    "seed": 0
+  },
+  {
+    "template": "My name is [M]. You can call me [M]. I said [M] three times.",
+    "method": "thrml_joint",
+    "config": {
+      "gibbs_sweeps": 1000,
+      "equality_weight": 10.0,
+      "k": 64
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 1064,
+    "n_chains": 64,
+    "agreement_rate": 1.0,
+    "lm_perplexity_mean": 1.0000581741333008,
+    "wall_time_s": 1.7941036224365234,
+    "seed": 0
+  },
+  {
+    "template": "My name is [M]. You can call me [M]. I said [M] three times.",
+    "method": "mask_predict",
+    "config": {
+      "n_iters": 1,
+      "temperature": 0.0
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 0,
+    "n_chains": 64,
+    "agreement_rate": 0.0,
+    "lm_perplexity_mean": 1.0019937753677368,
+    "wall_time_s": 0.04802656173706055,
+    "seed": 0
+  },
+  {
+    "template": "My name is [M]. You can call me [M]. I said [M] three times.",
+    "method": "mask_predict",
+    "config": {
+      "n_iters": 1,
+      "temperature": 1.0
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 0,
+    "n_chains": 64,
+    "agreement_rate": 0.0,
+    "lm_perplexity_mean": 1.066980242729187,
+    "wall_time_s": 0.053777217864990234,
+    "seed": 0
+  },
+  {
+    "template": "My name is [M]. You can call me [M]. I said [M] three times.",
+    "method": "mask_predict",
+    "config": {
+      "n_iters": 4,
+      "temperature": 0.0
+    },
+    "n_lm_forwards": 4,
+    "n_gibbs_sweeps": 0,
+    "n_chains": 64,
+    "agreement_rate": 0.0,
+    "lm_perplexity_mean": 1.0011849403381348,
+    "wall_time_s": 0.09163236618041992,
+    "seed": 0
+  },
+  {
+    "template": "My name is [M]. You can call me [M]. I said [M] three times.",
+    "method": "mask_predict",
+    "config": {
+      "n_iters": 4,
+      "temperature": 1.0
+    },
+    "n_lm_forwards": 4,
+    "n_gibbs_sweeps": 0,
+    "n_chains": 64,
+    "agreement_rate": 0.015625,
+    "lm_perplexity_mean": 1.015010118484497,
+    "wall_time_s": 0.11454916000366211,
+    "seed": 0
+  },
+  {
+    "template": "My name is [M]. You can call me [M]. I said [M] three times.",
+    "method": "mask_predict",
+    "config": {
+      "n_iters": 16,
+      "temperature": 0.0
+    },
+    "n_lm_forwards": 16,
+    "n_gibbs_sweeps": 0,
+    "n_chains": 64,
+    "agreement_rate": 0.0,
+    "lm_perplexity_mean": 1.0011849403381348,
+    "wall_time_s": 0.09587550163269043,
+    "seed": 0
+  },
+  {
+    "template": "My name is [M]. You can call me [M]. I said [M] three times.",
+    "method": "mask_predict",
+    "config": {
+      "n_iters": 16,
+      "temperature": 1.0
+    },
+    "n_lm_forwards": 16,
+    "n_gibbs_sweeps": 0,
+    "n_chains": 64,
+    "agreement_rate": 0.015625,
+    "lm_perplexity_mean": 1.015010118484497,
+    "wall_time_s": 0.11433553695678711,
+    "seed": 0
+  },
+  {
+    "template": "My name is [M]. You can call me [M]. I said [M] three times.",
+    "method": "mask_predict",
+    "config": {
+      "n_iters": 64,
+      "temperature": 0.0
+    },
+    "n_lm_forwards": 64,
+    "n_gibbs_sweeps": 0,
+    "n_chains": 64,
+    "agreement_rate": 0.0,
+    "lm_perplexity_mean": 1.0011849403381348,
+    "wall_time_s": 0.09633755683898926,
+    "seed": 0
+  },
+  {
+    "template": "My name is [M]. You can call me [M]. I said [M] three times.",
+    "method": "mask_predict",
+    "config": {
+      "n_iters": 64,
+      "temperature": 1.0
+    },
+    "n_lm_forwards": 64,
+    "n_gibbs_sweeps": 0,
+    "n_chains": 64,
+    "agreement_rate": 0.015625,
+    "lm_perplexity_mean": 1.015010118484497,
+    "wall_time_s": 0.11418581008911133,
+    "seed": 0
+  },
+  {
+    "template": "My name is [M]. You can call me [M]. I said [M] three times.",
+    "method": "ancestral_topk",
+    "config": {
+      "k": 32
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 0,
+    "n_chains": 64,
+    "agreement_rate": 0.0,
+    "lm_perplexity_mean": 1.0185824632644653,
+    "wall_time_s": 0.033890724182128906,
+    "seed": 0
+  },
+  {
+    "template": "My name is [M]. You can call me [M]. I said [M] three times.",
+    "method": "ancestral_topk",
+    "config": {
+      "k": 64
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 0,
+    "n_chains": 64,
+    "agreement_rate": 0.0,
+    "lm_perplexity_mean": 1.0372802019119263,
+    "wall_time_s": 0.03370189666748047,
+    "seed": 0
+  },
+  {
+    "template": "My name is [M]. You can call me [M]. I said [M] three times.",
+    "method": "ancestral_topk_iterative",
+    "config": {
+      "n_iters": 1,
+      "k": 32
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 0,
+    "n_chains": 64,
+    "agreement_rate": 0.0,
+    "lm_perplexity_mean": 1.0402584075927734,
+    "wall_time_s": 0.04417228698730469,
+    "seed": 0
+  },
+  {
+    "template": "My name is [M]. You can call me [M]. I said [M] three times.",
+    "method": "ancestral_topk_iterative",
+    "config": {
+      "n_iters": 1,
+      "k": 64
+    },
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 0,
+    "n_chains": 64,
+    "agreement_rate": 0.0,
+    "lm_perplexity_mean": 1.04917311668396,
+    "wall_time_s": 0.046228647232055664,
+    "seed": 0
+  },
+  {
+    "template": "My name is [M]. You can call me [M]. I said [M] three times.",
+    "method": "ancestral_topk_iterative",
+    "config": {
+      "n_iters": 2,
+      "k": 32
+    },
+    "n_lm_forwards": 2,
+    "n_gibbs_sweeps": 0,
+    "n_chains": 64,
+    "agreement_rate": 0.0,
+    "lm_perplexity_mean": 1.0368543863296509,
+    "wall_time_s": 0.0699305534362793,
+    "seed": 0
+  },
+  {
+    "template": "My name is [M]. You can call me [M]. I said [M] three times.",
+    "method": "ancestral_topk_iterative",
+    "config": {
+      "n_iters": 2,
+      "k": 64
+    },
+    "n_lm_forwards": 2,
+    "n_gibbs_sweeps": 0,
+    "n_chains": 64,
+    "agreement_rate": 0.0,
+    "lm_perplexity_mean": 1.0173574686050415,
+    "wall_time_s": 0.07063746452331543,
+    "seed": 0
+  },
+  {
+    "template": "My name is [M]. You can call me [M]. I said [M] three times.",
+    "method": "ancestral_topk_iterative",
+    "config": {
+      "n_iters": 3,
+      "k": 32
+    },
+    "n_lm_forwards": 3,
+    "n_gibbs_sweeps": 0,
+    "n_chains": 64,
+    "agreement_rate": 0.0,
+    "lm_perplexity_mean": 1.0647534132003784,
+    "wall_time_s": 0.09133076667785645,
+    "seed": 0
+  },
+  {
+    "template": "My name is [M]. You can call me [M]. I said [M] three times.",
+    "method": "ancestral_topk_iterative",
+    "config": {
+      "n_iters": 3,
+      "k": 64
+    },
+    "n_lm_forwards": 3,
+    "n_gibbs_sweeps": 0,
+    "n_chains": 64,
+    "agreement_rate": 0.0,
+    "lm_perplexity_mean": 1.0155999660491943,
+    "wall_time_s": 0.09247469902038574,
+    "seed": 0
+  },
+  {
+    "template": "My name is [M]. You can call me [M]. I said [M] three times.",
+    "method": "independent_full",
+    "config": {},
+    "n_lm_forwards": 1,
+    "n_gibbs_sweeps": 0,
+    "n_chains": 64,
+    "agreement_rate": 0.0,
+    "lm_perplexity_mean": 1.0530718564987183,
+    "wall_time_s": 0.033634185791015625,
+    "seed": 0
+  }
+]

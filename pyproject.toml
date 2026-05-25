@@ -17,6 +17,7 @@ dependencies = [
     "huggingface-hub>=0.23.0",
     "networkx>=3.2",
     "numpy>=1.26",
+    "datasets>=2.20",
     "matplotlib>=3.8",
     "ipykernel>=6.29",
     "jupyter>=1.0",
@@ -29,6 +30,7 @@ dependencies = [
     "packaging>=24",
     "setuptools>=70",
     "wheel>=0.43",
+    "marimo>=0.23.5",
 ]
 
 [build-system]

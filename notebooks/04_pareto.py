@@ -39,12 +39,14 @@ METHOD_COLORS = {
     "thrml_joint": "tab:red",
     "mask_predict": "tab:blue",
     "ancestral_topk": "tab:gray",
+    "ancestral_topk_iterative": "tab:green",
     "independent_full": "tab:olive",
 }
 METHOD_MARKERS = {
     "thrml_joint": "*",
     "mask_predict": "o",
     "ancestral_topk": "s",
+    "ancestral_topk_iterative": "D",
     "independent_full": "x",
 }
 
@@ -62,9 +64,6 @@ def short(text: str) -> str:
 def load() -> list[dict]:
     with open(RESULTS) as f:
         return json.load(f)
-
-
-# ------------- pareto_flops.png ---------------------------------------------
 
 
 def _plot_pareto_flops(records: list[dict]) -> None:
@@ -133,6 +132,23 @@ def _plot_pareto_flops(records: list[dict]) -> None:
                     label=method,
                 )
 
+        # ancestral_topk_iterative: line at fixed k=64 across n_iters.
+        ait = sorted(
+            (r for r in rows
+             if r["method"] == "ancestral_topk_iterative"
+             and r["config"].get("k") == 64),
+            key=lambda r: r["n_lm_forwards"],
+        )
+        if ait:
+            xs = [r["n_lm_forwards"] for r in ait]
+            ys = [r["agreement_rate"] for r in ait]
+            ax.plot(
+                xs, ys,
+                marker=METHOD_MARKERS["ancestral_topk_iterative"], linestyle=":",
+                color=METHOD_COLORS["ancestral_topk_iterative"],
+                label="ancestral_topk_iterative (k=64)",
+            )
+
         ax.set_xscale("log")
         ax.set_xlim(0.7, 100)
         ax.set_ylim(-0.05, 1.05)
@@ -148,9 +164,6 @@ def _plot_pareto_flops(records: list[dict]) -> None:
     fig.savefig(out, dpi=150, bbox_inches="tight")
     plt.close(fig)
     print(f"[plot] wrote {out}")
-
-
-# ------------- tsu_cost.png -------------------------------------------------
 
 
 def _plot_tsu_cost(records: list[dict]) -> None:
@@ -202,9 +215,6 @@ def _plot_tsu_cost(records: list[dict]) -> None:
     print(f"[plot] wrote {out}")
 
 
-# ------------- headline.png -------------------------------------------------
-
-
 def _plot_headline(records: list[dict]) -> None:
     by_method_x: dict[str, dict[int, list[float]]] = defaultdict(
         lambda: defaultdict(list)
@@ -216,6 +226,8 @@ def _plot_headline(records: list[dict]) -> None:
             if cfg["equality_weight"] != 5.0 or cfg["k"] != 64:
                 continue
         if r["method"] == "ancestral_topk" and r["config"]["k"] != 64:
+            continue
+        if r["method"] == "ancestral_topk_iterative" and r["config"].get("k") != 64:
             continue
         # for mask_predict, separate temp=0 and temp=1 visually
         method = r["method"]
@@ -238,6 +250,10 @@ def _plot_headline(records: list[dict]) -> None:
         elif method.startswith("thrml"):
             color = METHOD_COLORS["thrml_joint"]
             marker = "*"
+        elif method == "ancestral_topk_iterative":
+            color = METHOD_COLORS["ancestral_topk_iterative"]
+            marker = METHOD_MARKERS["ancestral_topk_iterative"]
+            ls = ":"
         elif method.startswith("ancestral"):
             color = METHOD_COLORS["ancestral_topk"]
             marker = "s"
@@ -272,16 +288,19 @@ def _plot_headline(records: list[dict]) -> None:
     print(f"[plot] wrote {out}")
 
 
-# ------------- markdown summary table ---------------------------------------
-
-
 def _print_summary(records: list[dict]) -> None:
     templates: list[str] = []
     for r in records:
         if r["template"] not in templates:
             templates.append(r["template"])
 
-    methods = ["thrml_joint", "mask_predict", "ancestral_topk", "independent_full"]
+    methods = [
+        "thrml_joint",
+        "mask_predict",
+        "ancestral_topk",
+        "ancestral_topk_iterative",
+        "independent_full",
+    ]
     print()
     print("# Best-config agreement per (template, method)")
     print()

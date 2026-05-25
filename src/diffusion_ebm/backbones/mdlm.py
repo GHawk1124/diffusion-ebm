@@ -11,8 +11,7 @@ module exposes:
   fill, used as the M3 baseline; ``n_iters=1`` reduces to a single-shot
   independent ancestral fill.
 
-Vocabulary / mask-token convention
-----------------------------------
+Vocabulary / mask-token convention:
 GPT-2 has 50,257 tokens.  MDLM extends this with one absorbing/[MASK] state,
 giving vocab_size = 50,258 and ``MASK_TOKEN_ID = 50_257``.
 """
@@ -40,8 +39,6 @@ class MDLM:
     vocab_size: int = MDLM_VOCAB
     mask_token_id: int = MASK_TOKEN_ID
 
-    # ----- construction -----------------------------------------------------
-
     @classmethod
     def load(cls, name: str = DEFAULT_MODEL, device: Optional[str] = None) -> "MDLM":
         device = device or ("cuda" if torch.cuda.is_available() else "cpu")
@@ -54,7 +51,30 @@ class MDLM:
         )
         return cls(model=model, tokenizer=tokenizer, device=torch.device(device))
 
-    # ----- forward + utilities ---------------------------------------------
+    @torch.no_grad()
+    def forward_hidden(
+        self, input_ids: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """One MDLM forward returning (logits, last_hidden_state).
+
+        Used by the M5c learned EBM factor: the pairwise scorer ψ reads the
+        last hidden state at the masked positions to produce token-pair
+        scores. Same sigma convention as ``forward``.
+        """
+        if input_ids.dim() == 1:
+            input_ids = input_ids.unsqueeze(0)
+        input_ids = input_ids.to(self.device)
+        mask_ratio = (input_ids == self.mask_token_id).float().mean(dim=-1)
+        sigma = mask_ratio.clamp(min=1e-3, max=1.0 - 1e-3)
+        out = self.model(
+            input_ids=input_ids,
+            timesteps=sigma,
+            return_dict=True,
+            output_hidden_states=True,
+        )
+        # MDLM hidden_states is [embed, *per-block]; last is pre-output_layer.
+        last_hidden = out.hidden_states[-1]
+        return out.logits, last_hidden
 
     @torch.no_grad()
     def forward(self, input_ids: torch.Tensor) -> torch.Tensor:
@@ -95,8 +115,6 @@ class MDLM:
             logits[..., self.mask_token_id] = -float("inf")
         unary, ids = logits.topk(k, dim=-1)
         return ids, unary
-
-    # ----- ancestral / mask-predict baseline -------------------------------
 
     @torch.no_grad()
     def mask_predict(
