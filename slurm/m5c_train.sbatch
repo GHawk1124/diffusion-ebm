@@ -111,6 +111,15 @@ echo
 nvidia-smi || echo "(nvidia-smi unavailable on this node)"
 echo
 
+# apptainer --nv mounts the host driver as libcuda.so.1 (versioned) but
+# Triton's JIT compile step calls gcc -lcuda which needs an unversioned
+# libcuda.so. Create a tiny stub dir with a symlink so linking succeeds; the
+# symlink's absolute target resolves inside the container to the real driver
+# that --nv places at /usr/lib/x86_64-linux-gnu/libcuda.so.1.
+_STUB_DIR="${TMPDIR:-/tmp}/triton_cuda_stub_${SLURM_JOB_ID:-$$}"
+mkdir -p "$_STUB_DIR"
+ln -sf /usr/lib/x86_64-linux-gnu/libcuda.so.1 "$_STUB_DIR/libcuda.so"
+
 # Reusable bind-mount arguments. The container expects results/plots inside
 # /opt/diffusion-ebm; HF_HOME stays at the in-image default but redirected
 # at the cache subdir so we can use cluster scratch.
@@ -119,11 +128,15 @@ APPTAINER_ARGS=(
     --bind "$RESULTS_DIR:/opt/diffusion-ebm/results"
     --bind "$PLOTS_DIR:/opt/diffusion-ebm/plots"
     --bind "$HF_CACHE:/opt/diffusion-ebm/.hf_cache"
+    --bind "$_STUB_DIR:/opt/triton_cuda_stub"
     --env  "TORCH_CUDA_ARCH_LIST=$CUDA_ARCH"
     # Pin the container's own gcc so Triton JIT doesn't pick up the PACE
     # spack-managed compiler (host CC/CXX leak in via the inherited env).
     --env  "CC=/usr/bin/gcc"
     --env  "CXX=/usr/bin/g++"
+    # Point Triton at the stub dir so its JIT gcc -lcuda link finds libcuda.so,
+    # and at runtime the symlink resolves to the real driver via --nv.
+    --env  "TRITON_LIBCUDA_PATH=/opt/triton_cuda_stub"
 )
 
 # ----- smoke (≈ 30 s) --------------------------------------------------------
