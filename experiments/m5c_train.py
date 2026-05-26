@@ -106,6 +106,20 @@ def _stream_owt(min_tokens: int = 64):
             yield text
 
 
+def _pretokenize_docs(
+    tokenizer, docs: list[str], seq_len: int
+) -> list[list[int]]:
+    """Tokenise documents in batches; keep only those with >= seq_len+2 tokens."""
+    result: list[list[int]] = []
+    chunk = 1024
+    for i in range(0, len(docs), chunk):
+        ids_batch = tokenizer(
+            docs[i : i + chunk], add_special_tokens=False
+        )["input_ids"]
+        result.extend(ids for ids in ids_batch if len(ids) >= seq_len + 2)
+    return result
+
+
 @dataclass
 class PairBatch:
     masked_ids: torch.Tensor  # [B, L]
@@ -115,15 +129,18 @@ class PairBatch:
     x_j_pos: torch.Tensor     # [B]
 
 
-def _build_batch(
-    tokenizer,
-    docs: list[str],
+def _build_batch_pretok(
+    tok_docs: list[list[int]],
     seq_len: int,
     batch: int,
     min_pair_dist: int,
     rng: random.Random,
 ) -> PairBatch | None:
-    """Sample one ``[batch]`` of (masked_ids, positions, true tokens)."""
+    """Sample one ``[batch]`` of (masked_ids, positions, true tokens).
+
+    tok_docs is a list of already-tokenised documents (list[int], each with
+    length >= seq_len+2).  No tokeniser call is made here.
+    """
     masked_rows: list[torch.Tensor] = []
     pos_a_l: list[int] = []
     pos_b_l: list[int] = []
@@ -133,14 +150,11 @@ def _build_batch(
     attempts = 0
     while len(masked_rows) < batch and attempts < batch * 8:
         attempts += 1
-        doc = rng.choice(docs)
-        ids = tokenizer.encode(doc, add_special_tokens=False)
-        if len(ids) < seq_len + 2:
-            # Reject short docs entirely — never train on EOS-padded "pairs",
-            # which would teach the scorer that pad-pad is a positive.
+        ids_full = rng.choice(tok_docs)
+        if len(ids_full) < seq_len + 2:
             continue
-        start = rng.randrange(0, len(ids) - seq_len + 1)
-        ids = ids[start : start + seq_len]
+        start = rng.randrange(0, len(ids_full) - seq_len + 1)
+        ids = ids_full[start : start + seq_len]
         if len(ids) != seq_len:
             continue
 
@@ -241,7 +255,7 @@ def train(args: argparse.Namespace) -> None:
     torch.manual_seed(args.seed)
     os.makedirs(args.ckpt_dir, exist_ok=True)
 
-    print(f"[m5c] device check; loading MDLM…")
+    print(f"[m5c] device check; loading MDLM…", flush=True)
     mdlm = MDLM.load()
     mdlm.model.eval()
     for p in mdlm.model.parameters():
@@ -257,30 +271,43 @@ def train(args: argparse.Namespace) -> None:
         vocab_size=mdlm.vocab_size,
     ).to(mdlm.device)
     n_params = sum(p.numel() for p in scorer.parameters())
-    print(f"[m5c] scorer params: {n_params/1e6:.2f}M")
+    print(f"[m5c] scorer params: {n_params/1e6:.2f}M", flush=True)
     eff_batch = args.batch * args.grad_accum
-    print(f"[m5c] effective batch: {eff_batch} ({args.batch} × {args.grad_accum} accum)")
+    print(f"[m5c] effective batch: {eff_batch} ({args.batch} × {args.grad_accum} accum)", flush=True)
 
     opt = torch.optim.AdamW(
         scorer.parameters(), lr=args.lr, weight_decay=args.wd
     )
 
-    # Corpus
+    # Corpus — buffer upfront and pre-tokenise so no tokeniser calls in the loop
     if args.corpus == "synthetic":
-        docs = _synthetic_docs()
+        docs_raw = _synthetic_docs()
         doc_iter = None
     elif args.corpus == "owt":
-        docs = []
+        docs_raw = []
         doc_iter = _stream_owt()
-        # buffer 4096 docs at start
-        for _ in range(4096):
+        print(f"[m5c] buffering up to {args.initial_buffer} OWT docs…", flush=True)
+        for _ in range(args.initial_buffer):
             try:
-                docs.append(next(doc_iter))
+                docs_raw.append(next(doc_iter))
             except StopIteration:
+                doc_iter = None
                 break
-        print(f"[m5c] buffered {len(docs)} OWT docs; will refresh every 1k steps")
+        print(f"[m5c] buffered {len(docs_raw)} raw docs", flush=True)
     else:
         raise ValueError(args.corpus)
+
+    print(f"[m5c] pre-tokenising {len(docs_raw)} docs…", flush=True)
+    tok_docs: list[list[int]] = _pretokenize_docs(
+        mdlm.tokenizer, docs_raw, args.seq_len
+    )
+    del docs_raw
+    print(
+        f"[m5c] {len(tok_docs)} valid docs (>= {args.seq_len + 2} tokens)",
+        flush=True,
+    )
+    if not tok_docs:
+        raise RuntimeError("No valid docs after length filter — check corpus / seq_len")
 
     log: list[dict] = []
     t0 = time.time()
@@ -292,9 +319,8 @@ def train(args: argparse.Namespace) -> None:
         opt.zero_grad(set_to_none=True)
         step_loss = 0.0
         for _acc in range(args.grad_accum):
-            pb = _build_batch(
-                mdlm.tokenizer,
-                docs,
+            pb = _build_batch_pretok(
+                tok_docs,
                 seq_len=args.seq_len,
                 batch=args.batch,
                 min_pair_dist=args.min_pair_dist,
@@ -333,7 +359,8 @@ def train(args: argparse.Namespace) -> None:
             rate = step / elapsed
             print(
                 f"[m5c] step {step:6d}  loss={avg:.4f}  pos>max_neg={acc:.3f} "
-                f"  {rate:.1f} steps/s"
+                f"  {rate:.1f} steps/s",
+                flush=True,
             )
             log.append(
                 dict(step=step, loss=avg, acc=acc, time_s=elapsed)
@@ -355,23 +382,30 @@ def train(args: argparse.Namespace) -> None:
                 ),
                 ckpt_path,
             )
-            print(f"[m5c] wrote {ckpt_path}")
+            print(f"[m5c] wrote {ckpt_path}", flush=True)
 
-        # Refresh OWT buffer every 1000 steps
-        if doc_iter is not None and step % 1000 == 0:
+        # Optionally refresh the pre-tokenised buffer (disabled by default)
+        if (
+            doc_iter is not None
+            and args.refresh_every > 0
+            and step % args.refresh_every == 0
+        ):
+            new_raw: list[str] = []
             try:
-                for _ in range(1024):
-                    docs.append(next(doc_iter))
+                for _ in range(2048):
+                    new_raw.append(next(doc_iter))
             except StopIteration:
-                pass
-            # Trim buffer to keep memory bounded
-            if len(docs) > 8192:
-                docs[:] = docs[-4096:]
+                doc_iter = None
+            new_tok = _pretokenize_docs(mdlm.tokenizer, new_raw, args.seq_len)
+            tok_docs.extend(new_tok)
+            if len(tok_docs) > args.initial_buffer * 2:
+                tok_docs[:] = tok_docs[-args.initial_buffer :]
+            print(f"[m5c] refreshed buffer: {len(tok_docs)} docs", flush=True)
 
     log_path = os.path.join(args.ckpt_dir, "log.json")
     with open(log_path, "w") as f:
         json.dump(log, f, indent=2)
-    print(f"[m5c] wrote {log_path}; total {time.time() - t0:.1f}s")
+    print(f"[m5c] wrote {log_path}; total {time.time() - t0:.1f}s", flush=True)
 
 
 def main() -> int:
@@ -392,6 +426,10 @@ def main() -> int:
     p.add_argument("--head-dim", type=int, default=64)
     p.add_argument("--mlp-dim", type=int, default=256)
     p.add_argument("--seed", type=int, default=0)
+    p.add_argument("--initial-buffer", type=int, default=50000,
+                   help="docs to buffer and pre-tokenise at startup")
+    p.add_argument("--refresh-every", type=int, default=0,
+                   help="re-fetch N docs from OWT every this many steps (0=disabled)")
     p.add_argument("--log-every", type=int, default=20)
     p.add_argument("--ckpt-every", type=int, default=500)
     p.add_argument(

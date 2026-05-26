@@ -22,7 +22,7 @@
 
 # ----- SLURM directives ------------------------------------------------------
 #SBATCH --job-name=m5c_train
-#SBATCH --time=24:00:00
+#SBATCH --time=7:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
@@ -77,6 +77,9 @@ export MAX_JOBS="4"
 export HF_HOME="${HF_HOME:-$OUT_DIR/.hf_cache}"
 mkdir -p "$HF_HOME"
 
+# Flush Python stdout immediately so SLURM log is readable in real time.
+export PYTHONUNBUFFERED=1
+
 cd "$REPO"
 
 # ----- job header ------------------------------------------------------------
@@ -121,6 +124,8 @@ uv run python experiments/m5c_train.py \
     --embed-dim 256 \
     --head-dim 128 \
     --mlp-dim 1024 \
+    --initial-buffer 50000 \
+    --refresh-every 0 \
     --log-every 200 \
     --ckpt-every 5000 \
     --ckpt-dir "$RESULTS_DIR/m5c" \
