@@ -75,7 +75,8 @@ class PairwiseScorer(nn.Module):
         x_j: torch.Tensor,  # [B] long
     ) -> torch.Tensor:
         """Return ψ(x_i, x_j | h_a, h_b), shape [B]."""
-        return (self._f(h_a, x_i) * self._g(h_b, x_j)).sum(dim=-1)
+        scale = self.head_dim ** 0.5
+        return (self._f(h_a, x_i) * self._g(h_b, x_j)).sum(dim=-1) / scale
 
     def forward_pos_neg(
         self,
@@ -96,7 +97,8 @@ class PairwiseScorer(nn.Module):
         h_b_exp = h_b.unsqueeze(1).expand(-1, K, -1).reshape(B * K, -1)
         feat_a_neg = self._f(h_a_exp, x_i_neg.reshape(-1)).view(B, K, -1)
         feat_b_neg = self._g(h_b_exp, x_j_neg.reshape(-1)).view(B, K, -1)
-        neg = (feat_a_neg * feat_b_neg).sum(dim=-1)
+        scale = self.head_dim ** 0.5
+        neg = (feat_a_neg * feat_b_neg).sum(dim=-1) / scale
         return pos, neg
 
     @torch.no_grad()
@@ -117,7 +119,7 @@ class PairwiseScorer(nn.Module):
         hb_exp = h_b.unsqueeze(0).expand(k_b, -1)
         fa = self._f(ha_exp, ids_a)  # [k_a, head_dim]
         gb = self._g(hb_exp, ids_b)  # [k_b, head_dim]
-        return fa @ gb.T              # [k_a, k_b]
+        return fa @ gb.T / (self.head_dim ** 0.5)  # [k_a, k_b]
 
 
 def stack_learned_factor(

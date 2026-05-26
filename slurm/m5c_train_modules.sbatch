@@ -119,7 +119,7 @@ uv run python experiments/m5c_train.py \
     --top-k 64 \
     --seq-len 64 \
     --min-pair-dist 4 \
-    --lr 3e-4 \
+    --lr 1e-4 \
     --wd 0.01 \
     --embed-dim 256 \
     --head-dim 128 \
