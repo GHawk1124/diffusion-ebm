@@ -42,10 +42,10 @@ set -euo pipefail
 SIF="${SIF:-$HOME/diffusion-ebm.sif}"
 REPO="${REPO:-$SLURM_SUBMIT_DIR}"
 
-# All bulk writes (checkpoints ~4 GB, HF streaming cache potentially several
-# GB) go to $OUT_DIR. On PACE we default to per-user scratch (15 TB quota) so
-# the 20 GB home filesystem doesn't fill mid-run. Off-PACE we fall back to the
-# repo. Override with --export=ALL,OUT_DIR=/path/...
+# All bulk writes (checkpoints ~4 GB) go to $OUT_DIR. On PACE we default to
+# per-user scratch (15 TB quota) so the 20 GB home filesystem doesn't fill
+# mid-run. Off-PACE we fall back to the repo.
+# Override with --export=ALL,OUT_DIR=/path/...
 if [[ -d "/storage/scratch1/1/${USER:-}" ]]; then
     OUT_DIR="${OUT_DIR:-/storage/scratch1/1/$USER/diffusion-ebm}"
 else
@@ -53,7 +53,12 @@ else
 fi
 RESULTS_DIR="${RESULTS_DIR:-$OUT_DIR/results}"
 PLOTS_DIR="${PLOTS_DIR:-$OUT_DIR/plots}"
-HF_CACHE="${HF_CACHE:-$OUT_DIR/.hf_cache}"
+# transformers writes a 'modules/' subdir into HF_HOME at runtime for dynamic
+# module code (trust_remote_code). The SIF bakes model weights into
+# /opt/diffusion-ebm/.hf_cache (read-only), so we bind-mount only the
+# modules subdir to a writable scratch location rather than overlaying the
+# whole cache (which would hide the baked-in weights).
+HF_MODULES="${HF_MODULES:-$OUT_DIR/.hf_modules}"
 
 STEPS="${STEPS:-200000}"
 BATCH="${BATCH:-256}"
@@ -90,7 +95,7 @@ if [[ ! -f "$SIF" ]]; then
 fi
 
 cd "$REPO"
-mkdir -p "$RESULTS_DIR/m5c" "$PLOTS_DIR" "$HF_CACHE"
+mkdir -p "$RESULTS_DIR/m5c" "$PLOTS_DIR" "$HF_MODULES"
 
 # ----- job header ------------------------------------------------------------
 echo "================================================================"
@@ -101,7 +106,7 @@ echo "  sif:        $SIF"
 echo "  out dir:    $OUT_DIR"
 echo "  results:    $RESULTS_DIR"
 echo "  plots:      $PLOTS_DIR"
-echo "  hf cache:   $HF_CACHE"
+echo "  hf modules: $HF_MODULES"
 echo "  steps:      $STEPS"
 echo "  batch:      $BATCH"
 echo "  seed:       $SEED"
@@ -127,7 +132,7 @@ APPTAINER_ARGS=(
     --nv
     --bind "$RESULTS_DIR:/opt/diffusion-ebm/results"
     --bind "$PLOTS_DIR:/opt/diffusion-ebm/plots"
-    --bind "$HF_CACHE:/opt/diffusion-ebm/.hf_cache"
+    --bind "$HF_MODULES:/opt/diffusion-ebm/.hf_cache/modules"
     --bind "$_STUB_DIR:/opt/triton_cuda_stub"
     --env  "TORCH_CUDA_ARCH_LIST=$CUDA_ARCH"
     # Pin the container's own gcc so Triton JIT doesn't pick up the PACE
