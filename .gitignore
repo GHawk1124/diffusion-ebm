@@ -26,7 +26,6 @@ results/m5c_smoke/*
 
 # Local planning and cluster submit files
 .claude/
-slurm/
 
 # Hugging Face cache (if user puts it inside repo)
 .hf_cache/
