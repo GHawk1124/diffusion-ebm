@@ -125,6 +125,12 @@ _STUB_DIR="${TMPDIR:-/tmp}/triton_cuda_stub_${SLURM_JOB_ID:-$$}"
 mkdir -p "$_STUB_DIR"
 ln -sf /usr/lib/x86_64-linux-gnu/libcuda.so.1 "$_STUB_DIR/libcuda.so"
 
+# Triton also compiles a small driver.c at runtime via gcc. On this cluster
+# gcc can't find its own stddef.h (internal headers not on the default search
+# path inside the container). Probe the path once and pass it as C_INCLUDE_PATH
+# so gcc finds stddef.h when Triton calls it.
+_GCC_INCLUDE=$(apptainer exec "$SIF" gcc -print-file-name=include 2>/dev/null || true)
+
 # Reusable bind-mount arguments. The container expects results/plots inside
 # /opt/diffusion-ebm; HF_HOME stays at the in-image default but redirected
 # at the cache subdir so we can use cluster scratch.
@@ -142,6 +148,9 @@ APPTAINER_ARGS=(
     # Point Triton at the stub dir so its JIT gcc -lcuda link finds libcuda.so,
     # and at runtime the symlink resolves to the real driver via --nv.
     --env  "TRITON_LIBCUDA_PATH=/opt/triton_cuda_stub"
+    # Expose GCC's internal include dir so Triton's driver.c compilation can
+    # find stddef.h (included transitively via stdlib.h -> cuda.h).
+    --env  "C_INCLUDE_PATH=${_GCC_INCLUDE}"
 )
 
 # ----- smoke (≈ 30 s) --------------------------------------------------------

@@ -23,13 +23,26 @@ Data sources:
   * ``--corpus owt`` — streams OpenWebText via HF datasets. Requires
     network. Default for the long training run.
 
-Run (long training):
+Run (long training, A100):
 
     LD_LIBRARY_PATH="/run/opengl-driver/lib:$LD_LIBRARY_PATH" \\
     TRITON_LIBCUDA_PATH="/run/opengl-driver/lib" \\
         uv run python experiments/m5c_train.py \\
             --corpus owt --steps 200000 --batch 256 --neg-k 16 \\
             --ckpt-dir results/m5c
+
+Run (8 GB laptop GPU, overnight):
+
+    LD_LIBRARY_PATH="/run/opengl-driver/lib:$LD_LIBRARY_PATH" \\
+    TRITON_LIBCUDA_PATH="/run/opengl-driver/lib" \\
+        uv run python experiments/m5c_train.py \\
+            --corpus owt --steps 100000 --batch 32 --grad-accum 4 \\
+            --neg-k 8 --embed-dim 128 --head-dim 64 --mlp-dim 256 \\
+            --ckpt-dir results/m5c_local
+
+``--grad-accum N`` accumulates gradients across N micro-batches before each
+optimizer step, so ``effective_batch = batch × grad_accum``.  Peak VRAM is
+determined by ``--batch``; effective signal by the product.
 """
 
 from __future__ import annotations
@@ -245,6 +258,8 @@ def train(args: argparse.Namespace) -> None:
     ).to(mdlm.device)
     n_params = sum(p.numel() for p in scorer.parameters())
     print(f"[m5c] scorer params: {n_params/1e6:.2f}M")
+    eff_batch = args.batch * args.grad_accum
+    print(f"[m5c] effective batch: {eff_batch} ({args.batch} × {args.grad_accum} accum)")
 
     opt = torch.optim.AdamW(
         scorer.parameters(), lr=args.lr, weight_decay=args.wd
@@ -270,41 +285,50 @@ def train(args: argparse.Namespace) -> None:
     log: list[dict] = []
     t0 = time.time()
     losses_window: list[float] = []
+    accum_loss = 0.0
+    last_pos_scores = last_neg_scores = None
     for step in range(1, args.steps + 1):
-        pb = _build_batch(
-            mdlm.tokenizer,
-            docs,
-            seq_len=args.seq_len,
-            batch=args.batch,
-            min_pair_dist=args.min_pair_dist,
-            rng=rng,
-        )
-        if pb is None:
-            continue
-        feats = _encode_and_negatives(mdlm, pb, args.neg_k, args.top_k)
         scorer.train()
-        pos_scores, neg_scores = scorer.forward_pos_neg(
-            feats["h_a"],
-            feats["h_b"],
-            feats["x_i_pos"],
-            feats["x_j_pos"],
-            feats["x_i_neg"],
-            feats["x_j_neg"],
-        )
-        loss = _info_nce(pos_scores, neg_scores)
-
         opt.zero_grad(set_to_none=True)
-        loss.backward()
+        step_loss = 0.0
+        for _acc in range(args.grad_accum):
+            pb = _build_batch(
+                mdlm.tokenizer,
+                docs,
+                seq_len=args.seq_len,
+                batch=args.batch,
+                min_pair_dist=args.min_pair_dist,
+                rng=rng,
+            )
+            if pb is None:
+                continue
+            feats = _encode_and_negatives(mdlm, pb, args.neg_k, args.top_k)
+            pos_scores, neg_scores = scorer.forward_pos_neg(
+                feats["h_a"],
+                feats["h_b"],
+                feats["x_i_pos"],
+                feats["x_j_pos"],
+                feats["x_i_neg"],
+                feats["x_j_neg"],
+            )
+            loss = _info_nce(pos_scores, neg_scores) / args.grad_accum
+            loss.backward()
+            step_loss += float(loss.item())
+            last_pos_scores, last_neg_scores = pos_scores.detach(), neg_scores.detach()
         torch.nn.utils.clip_grad_norm_(scorer.parameters(), 1.0)
         opt.step()
 
-        losses_window.append(float(loss.item()))
+        losses_window.append(step_loss)
         if step % args.log_every == 0:
             avg = sum(losses_window) / len(losses_window)
             losses_window.clear()
             # NCE accuracy proxy: fraction of batch where pos > max(neg)
-            with torch.no_grad():
-                acc = float((pos_scores > neg_scores.max(dim=1).values).float().mean())
+            acc = 0.0
+            if last_pos_scores is not None and last_neg_scores is not None:
+                with torch.no_grad():
+                    acc = float(
+                        (last_pos_scores > last_neg_scores.max(dim=1).values).float().mean()
+                    )
             elapsed = time.time() - t0
             rate = step / elapsed
             print(
@@ -360,6 +384,8 @@ def main() -> int:
                    help="LM-marginal top-k pool to sample negatives from")
     p.add_argument("--seq-len", type=int, default=64)
     p.add_argument("--min-pair-dist", type=int, default=4)
+    p.add_argument("--grad-accum", type=int, default=1,
+                   help="accumulate gradients over N micro-batches before each optimizer step")
     p.add_argument("--lr", type=float, default=3e-4)
     p.add_argument("--wd", type=float, default=0.01)
     p.add_argument("--embed-dim", type=int, default=128)
