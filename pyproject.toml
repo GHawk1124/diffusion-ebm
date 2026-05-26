@@ -50,6 +50,14 @@ explicit = true
 
 [tool.uv.sources]
 torch = { index = "pytorch-cu124" }
+# Pin flash-attn to Dao-AILab's pre-built wheel for torch 2.6 + cu12 + cp312
+# with cxx11_abi=FALSE.  Source-building flash-attn from PyPI's sdist
+# produces a .so linked with cxx11_abi=1 but torch 2.6.0+cu124 from
+# PyTorch's index ships with cxx11_abi=0, so the source-built flash-attn
+# fails at import with undefined `c10::Error::Error(... std::__cxx11::string)`.
+# Using the matched pre-built wheel skips the 10-min compile and avoids the
+# ABI mismatch entirely.
+flash-attn = { url = "https://github.com/Dao-AILab/flash-attention/releases/download/v2.7.4.post1/flash_attn-2.7.4.post1%2Bcu12torch2.6cxx11abiFALSE-cp312-cp312-linux_x86_64.whl" }
 
 # PyTorch's cu124 wheels use the plain `linux_x86_64` platform tag rather than
 # `manylinux_*`, which uv treats as system-specific by default.  Declaring the

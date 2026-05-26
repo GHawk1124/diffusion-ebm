@@ -104,16 +104,23 @@
               exit 1
             fi
 
-            if ! grep -q "^$USER:" /etc/subuid 2>/dev/null; then
-              echo "warning: $USER is not in /etc/subuid." >&2
-              echo "  rootless --fakeroot will likely fail.  fixes:" >&2
-              echo "    (NixOS) users.users.$USER.subUidRanges = [{ startUid = 100000; count = 65536; }];" >&2
-              echo "    (any)   sudo usermod --add-subuids 100000-165535 --add-subgids 100000-165535 $USER" >&2
-              echo "    (or)    copy $DEF to the cluster login node and build there." >&2
-            fi
+            # NixOS-specific apptainer build flags:
+            #  --fakeroot                 enable appears-as-root mode (umbrella).
+            #  --ignore-subuid            don't go through newuidmap/newgidmap
+            #                             (NixOS lacks the setuid helpers); fall
+            #                             back to root-mapped userns.
+            #  --ignore-fakeroot-command  don't inject the host's `fakeroot`
+            #                             binary into the container — on NixOS
+            #                             it's nix-store-linked and can't load
+            #                             its libs once the Ubuntu rootfs is in
+            #                             place.  We don't actually need it:
+            #                             inside the userns we appear as UID 0
+            #                             so apt-get / pip / etc. work without
+            #                             the LD_PRELOAD shim.
+            APPTAINER_BUILD_ARGS=(--fakeroot --ignore-subuid --ignore-fakeroot-command --force)
 
             echo ":: writing $OUTPUT (expect ~15-20 min for the first build)"
-            apptainer build --fakeroot --force "$OUTPUT" "$DEF"
+            apptainer build "''${APPTAINER_BUILD_ARGS[@]}" "$OUTPUT" "$DEF"
 
             echo
             echo ":: image built: $OUTPUT"

@@ -1,4 +1,15 @@
 Bootstrap: docker
+# NVIDIA only ships cuda 12.4 for ubuntu22.04 (24.04 starts at 12.5).  We
+# stay on 22.04 and pull Python 3.12 from the deadsnakes PPA *without*
+# software-properties-common (which would drag in dbus/polkit/packagekit
+# and trip apptainer's --ignore-subuid sandbox).  Adding the apt source
+# by hand with a signed-by keyring is the minimal-deps path.
+#
+# Why not uv's python-build-standalone?  Its bundled libstdc++ ships with
+# a newer cxx11 ABI baseline than the system libstdc++ torch's cu124 wheel
+# was linked against, which causes flash_attn_2_cuda.so to reference c10
+# symbols (e.g. c10::Error::Error with std::__cxx11::basic_string) that
+# torch's libtorch.so doesn't export.
 From: nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
 
 # Apptainer definition for CUDA 12.4 hosts with apptainer and the
@@ -31,13 +42,30 @@ From: nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
     set -eux
     export DEBIAN_FRONTEND=noninteractive
 
-    # System packages.
+    # apptainer's `--ignore-subuid --ignore-fakeroot-command` build mode runs
+    # %post inside a single-mapped user namespace (only UID 0 exists).  apt
+    # tries to drop privileges to UID 100 (`_apt`) for HTTP fetches and the
+    # setegid/seteuid syscalls fail.  Disable the sandbox so apt runs as root.
+    echo 'APT::Sandbox::User "root";' > /etc/apt/apt.conf.d/00-no-sandbox
+
+    # Base apt set.  gnupg is here because we add the deadsnakes signing key
+    # manually below; everything else is the standard C/C++/Python build
+    # toolchain we need anyway.
     apt-get update
     apt-get install -y --no-install-recommends \
-        software-properties-common \
-        ca-certificates curl git \
+        ca-certificates curl gnupg git \
         build-essential ninja-build
-    add-apt-repository -y ppa:deadsnakes/ppa
+    apt-get clean
+    rm -rf /var/lib/apt/lists/*
+
+    # Add deadsnakes manually: just the apt source + signed-by keyring, no
+    # software-properties-common.  Key fingerprint
+    # F23C5A6CF475977595C89F51BA6932366A755776 is the deadsnakes PPA signer.
+    install -d /usr/share/keyrings
+    curl -fsSL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0xF23C5A6CF475977595C89F51BA6932366A755776" \
+        | gpg --dearmor -o /usr/share/keyrings/deadsnakes.gpg
+    echo "deb [signed-by=/usr/share/keyrings/deadsnakes.gpg] https://ppa.launchpadcontent.net/deadsnakes/ppa/ubuntu jammy main" \
+        > /etc/apt/sources.list.d/deadsnakes.list
     apt-get update
     apt-get install -y --no-install-recommends \
         python3.12 python3.12-venv python3.12-dev
@@ -65,7 +93,7 @@ From: nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
     export CUDA_PATH=/usr/local/cuda
     export PATH=/usr/local/cuda/bin:/usr/local/bin:$PATH
     export UV_PROJECT_ENVIRONMENT=/opt/diffusion-ebm/.venv
-    export UV_PYTHON=python3.12
+    export UV_PYTHON=python3.12   # use the system python3.12 (deadsnakes)
 
     # --frozen makes the build fail loudly if uv.lock drifted from pyproject.
     # --no-dev keeps Jupyter / marimo dev extras out of the runtime image.
