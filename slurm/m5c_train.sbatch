@@ -41,12 +41,29 @@ set -euo pipefail
 # ----- knobs (override via sbatch --export=ALL,KEY=VAL ...) ------------------
 SIF="${SIF:-$HOME/diffusion-ebm.sif}"
 REPO="${REPO:-$SLURM_SUBMIT_DIR}"
-HF_CACHE="${HF_CACHE:-$REPO/.hf_cache}"
+
+# All bulk writes (checkpoints ~4 GB, HF streaming cache potentially several
+# GB) go to $OUT_DIR. On PACE we default to per-user scratch (15 TB quota) so
+# the 20 GB home filesystem doesn't fill mid-run. Off-PACE we fall back to the
+# repo. Override with --export=ALL,OUT_DIR=/path/...
+if [[ -d "/storage/scratch1/1/${USER:-}" ]]; then
+    OUT_DIR="${OUT_DIR:-/storage/scratch1/1/$USER/diffusion-ebm}"
+else
+    OUT_DIR="${OUT_DIR:-$REPO}"
+fi
+RESULTS_DIR="${RESULTS_DIR:-$OUT_DIR/results}"
+PLOTS_DIR="${PLOTS_DIR:-$OUT_DIR/plots}"
+HF_CACHE="${HF_CACHE:-$OUT_DIR/.hf_cache}"
+
 STEPS="${STEPS:-200000}"
 BATCH="${BATCH:-256}"
 SEED="${SEED:-0}"
 RUN_SMOKE="${RUN_SMOKE:-1}"
 RUN_EVAL="${RUN_EVAL:-1}"
+# Compute capability of the GPU you actually land on. SIF bakes 8.0;8.9;9.0
+# so this only matters for any runtime JIT (rare in our code). Default = H100.
+#   A100  → 8.0    L40S → 8.9    H100/H200 → 9.0    Blackwell → not supported
+CUDA_ARCH="${CUDA_ARCH:-9.0}"
 
 # ----- environment -----------------------------------------------------------
 # PACE wraps apptainer behind a Lmod module. The fallback covers clusters
@@ -73,7 +90,7 @@ if [[ ! -f "$SIF" ]]; then
 fi
 
 cd "$REPO"
-mkdir -p results/m5c plots "$HF_CACHE"
+mkdir -p "$RESULTS_DIR/m5c" "$PLOTS_DIR" "$HF_CACHE"
 
 # ----- job header ------------------------------------------------------------
 echo "================================================================"
@@ -81,6 +98,9 @@ echo "  job:        ${SLURM_JOB_NAME:-m5c_train} (${SLURM_JOB_ID:-local})"
 echo "  node:       ${SLURMD_NODENAME:-$HOSTNAME}"
 echo "  repo:       $REPO"
 echo "  sif:        $SIF"
+echo "  out dir:    $OUT_DIR"
+echo "  results:    $RESULTS_DIR"
+echo "  plots:      $PLOTS_DIR"
 echo "  hf cache:   $HF_CACHE"
 echo "  steps:      $STEPS"
 echo "  batch:      $BATCH"
@@ -96,10 +116,10 @@ echo
 # at the cache subdir so we can use cluster scratch.
 APPTAINER_ARGS=(
     --nv
-    --bind "$REPO/results:/opt/diffusion-ebm/results"
-    --bind "$REPO/plots:/opt/diffusion-ebm/plots"
+    --bind "$RESULTS_DIR:/opt/diffusion-ebm/results"
+    --bind "$PLOTS_DIR:/opt/diffusion-ebm/plots"
     --bind "$HF_CACHE:/opt/diffusion-ebm/.hf_cache"
-    --env  "TORCH_CUDA_ARCH_LIST=9.0"   # H100/H200 (Hopper). Use 8.0 for A100, 8.9 for L40S.
+    --env  "TORCH_CUDA_ARCH_LIST=$CUDA_ARCH"
 )
 
 # ----- smoke (≈ 30 s) --------------------------------------------------------
@@ -139,11 +159,14 @@ echo
 # ----- eval (≈ 10 min) -------------------------------------------------------
 if [[ "$RUN_EVAL" == "1" ]]; then
     # shellcheck disable=SC2012 # checkpoint filenames are scorer_step\d+\.pt — alphanumeric only.
-    CKPT="$(ls -t results/m5c/scorer_step*.pt 2>/dev/null | head -1 || true)"
-    if [[ -z "$CKPT" ]]; then
-        echo "warn: no checkpoint at results/m5c/scorer_step*.pt — skipping eval" >&2
+    CKPT_HOST="$(ls -t "$RESULTS_DIR/m5c"/scorer_step*.pt 2>/dev/null | head -1 || true)"
+    if [[ -z "$CKPT_HOST" ]]; then
+        echo "warn: no checkpoint at $RESULTS_DIR/m5c/scorer_step*.pt — skipping eval" >&2
     else
-        echo "==> M5c eval: $CKPT"
+        # Convert host path → in-container path (RESULTS_DIR is bind-mounted at
+        # /opt/diffusion-ebm/results).
+        CKPT="results/m5c/$(basename "$CKPT_HOST")"
+        echo "==> M5c eval: $CKPT_HOST"
         SECONDS=0
         apptainer run "${APPTAINER_ARGS[@]}" "$SIF" \
             python experiments/m5c_eval.py \
