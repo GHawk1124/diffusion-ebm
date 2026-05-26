@@ -120,6 +120,10 @@ APPTAINER_ARGS=(
     --bind "$PLOTS_DIR:/opt/diffusion-ebm/plots"
     --bind "$HF_CACHE:/opt/diffusion-ebm/.hf_cache"
     --env  "TORCH_CUDA_ARCH_LIST=$CUDA_ARCH"
+    # Pin the container's own gcc so Triton JIT doesn't pick up the PACE
+    # spack-managed compiler (host CC/CXX leak in via the inherited env).
+    --env  "CC=/usr/bin/gcc"
+    --env  "CXX=/usr/bin/g++"
 )
 
 # ----- smoke (≈ 30 s) --------------------------------------------------------
