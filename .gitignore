@@ -38,3 +38,5 @@ result-*
 # Apptainer / Singularity images (only the .def file is checked in)
 *.sif
 *.img
+
+results/
