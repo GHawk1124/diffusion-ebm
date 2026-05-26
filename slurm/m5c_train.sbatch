@@ -59,6 +59,11 @@ PLOTS_DIR="${PLOTS_DIR:-$OUT_DIR/plots}"
 # modules subdir to a writable scratch location rather than overlaying the
 # whole cache (which would hide the baked-in weights).
 HF_MODULES="${HF_MODULES:-$OUT_DIR/.hf_modules}"
+# OWT dataset metadata is written into .hf_cache/hub/ at runtime by
+# huggingface_hub even with streaming=True. That dir is read-only in the SIF
+# (MDLM weights live there). Bind only the OWT dataset sub-dir to scratch so
+# the MDLM weights at hub/models--kuleshov-group--mdlm-owt/ stay visible.
+HF_OWT="${HF_OWT:-$OUT_DIR/.hf_owt}"
 
 STEPS="${STEPS:-200000}"
 BATCH="${BATCH:-256}"
@@ -95,7 +100,7 @@ if [[ ! -f "$SIF" ]]; then
 fi
 
 cd "$REPO"
-mkdir -p "$RESULTS_DIR/m5c" "$PLOTS_DIR" "$HF_MODULES"
+mkdir -p "$RESULTS_DIR/m5c" "$PLOTS_DIR" "$HF_MODULES" "$HF_OWT"
 
 # ----- job header ------------------------------------------------------------
 echo "================================================================"
@@ -139,6 +144,7 @@ APPTAINER_ARGS=(
     --bind "$RESULTS_DIR:/opt/diffusion-ebm/results"
     --bind "$PLOTS_DIR:/opt/diffusion-ebm/plots"
     --bind "$HF_MODULES:/opt/diffusion-ebm/.hf_cache/modules"
+    --bind "$HF_OWT:/opt/diffusion-ebm/.hf_cache/hub/datasets--Skylion007--openwebtext"
     --bind "$_STUB_DIR:/opt/triton_cuda_stub"
     --env  "TORCH_CUDA_ARCH_LIST=$CUDA_ARCH"
     # Pin the container's own gcc so Triton JIT doesn't pick up the PACE
