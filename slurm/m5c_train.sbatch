@@ -64,6 +64,7 @@ HF_MODULES="${HF_MODULES:-$OUT_DIR/.hf_modules}"
 # (MDLM weights live there). Bind only the OWT dataset sub-dir to scratch so
 # the MDLM weights at hub/models--kuleshov-group--mdlm-owt/ stay visible.
 HF_OWT="${HF_OWT:-$OUT_DIR/.hf_owt}"
+HF_LOCKS="${HF_LOCKS:-$OUT_DIR/.hf_locks}"
 
 STEPS="${STEPS:-200000}"
 BATCH="${BATCH:-256}"
@@ -100,7 +101,7 @@ if [[ ! -f "$SIF" ]]; then
 fi
 
 cd "$REPO"
-mkdir -p "$RESULTS_DIR/m5c" "$PLOTS_DIR" "$HF_MODULES" "$HF_OWT"
+mkdir -p "$RESULTS_DIR/m5c" "$PLOTS_DIR" "$HF_MODULES" "$HF_OWT" "$HF_LOCKS"
 
 # ----- job header ------------------------------------------------------------
 echo "================================================================"
@@ -145,6 +146,7 @@ APPTAINER_ARGS=(
     --bind "$PLOTS_DIR:/opt/diffusion-ebm/plots"
     --bind "$HF_MODULES:/opt/diffusion-ebm/.hf_cache/modules"
     --bind "$HF_OWT:/opt/diffusion-ebm/.hf_cache/hub/datasets--Skylion007--openwebtext"
+    --bind "$HF_LOCKS:/opt/diffusion-ebm/.hf_cache/hub/.locks"
     --bind "$_STUB_DIR:/opt/triton_cuda_stub"
     --env  "TORCH_CUDA_ARCH_LIST=$CUDA_ARCH"
     # Pin the container's own gcc so Triton JIT doesn't pick up the PACE
