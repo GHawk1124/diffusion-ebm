@@ -81,20 +81,26 @@ diffusion-ebm/
   .envrc                       # `use flake` (for nix-direnv users)
   .python-version              # 3.12
   pyproject.toml               # deps, torch+cu124 pin, no-build-isolation
-  main.py                      # placeholder (delete before M5)
 
   src/diffusion_ebm/
-    __init__.py
     backbones/
-      __init__.py
-      mdlm.py                  # M2: MDLM HF wrapper
-    sampler/                   # M3 (empty)
-    factors/                   # M3 (empty)
-    tasks/                     # M3 (empty)
-    metrics/                   # M3 (empty)
+      mdlm.py                  # M2: MDLM HF wrapper + forward_hidden
+    factors/
+      equality.py              # M3: hard equality [k,k] table
+      learned.py               # M5c: PairwiseScorer bilinear ψ + log_temp
+      unary.py
+    sampler/
+      thrml_joint.py           # M3: hard-equality THRML factor graph
+      thrml_joint_learned.py   # M5c: learned-ψ THRML factor graph
+      baselines.py             # M5a: ancestral, mask-predict, iterative-topk
+    tasks/
+      multihole.py             # M3–M5b: 8 template families + all_templates()
+    metrics/
+      agreement.py             # agreement_rate, lm_perplexity
     synth/
       potts_chain.py           # M1: ferromagnetic Potts chain
-    utils/                     # (empty)
+    utils/
+      coloring.py              # graph coloring for THRML block assignment
 
   notebooks/                   # all are runnable .py with jupytext-style cells
     00_smoke.py                # M0: env check
@@ -103,15 +109,30 @@ diffusion-ebm/
     02_mdlm_bridge.py          # M2: end-to-end MDLM forward + mask-predict
     03_mvp1_multihole.py       # M3: multi-hole agreement headline
     04_pareto.py               # M4: Pareto plots + summary table
+    05_boundary.py             # M5b: boundary template sweep
+    06_learned.py              # M5c: learned-ψ overlay vs M5b boundary
+    07_tour.py                 # demo tour
+    08_tour_marimo.py          # marimo interactive version
 
   experiments/
-    run_pareto.py              # M4: sweep driver → results/results.json
+    run_pareto.py              # M4: sweep driver
+    verify_m5a.py              # M5a: distributional sanity check
+    m5c_smoke.py               # M5c: 300-step synth train + pipeline check
+    m5c_train.py               # M5c: OWT + synth training loop
+    m5c_eval.py                # M5c: full template sweep with --temp-override
 
-  plots/                       # gitignored; mvp0_potts_alignment.png lives here
-  results/                     # gitignored
+  slurm/
+    m5c_train_modules.sbatch   # v3 training job (k=128, 200k steps)
+    m5c_train_k256.sbatch      # v3 k=256 retrain (THRML uint8 ceiling)
+    m5c_eval_override.sbatch   # A3 temp-override eval (historical)
+    m5c_eval_k256.sbatch       # k=256 eval on existing checkpoint
+
+  plots/                       # gitignored
+  results/                     # gitignored; PACE scratch at
+                               #   /storage/scratch1/1/gcomes3/diffusion-ebm/
 ```
 
-## Status (2026-05-08, M5a + M5b complete; M5c prepped, awaits A100 day)
+## Status (2026-05-27, M5c complete at k=256; M5d in progress toward EMNLP Findings)
 
 - [x] **M0** — project skeleton, env install, smoke test (PASS).
 - [x] **M1** — Potts chain MVP0 (PASS: independent 0/500 fully aligned;
@@ -136,58 +157,79 @@ diffusion-ebm/
       (1.000) and stays at 0.000 on *variable* and *repeat-3* even at
       64 LM forwards. Headline averaged across templates: THRML ~0.84
       at 1 LM forward vs 0.33 (T=0) / 0.15 (T=1) for mask-predict at
-      64 LM forwards. See `plots/{headline,pareto_flops,tsu_cost}.png`,
-      `results/results.json`, and `README.md`).
+      64 LM forwards.)
 - [x] **M5a** — strengthened iterative top-k baseline (PASS: 123-run
       sweep, ~2 min total. New `ancestral_topk_iterative` commits the
-      most-confident hole per chain per iteration so subsequent
-      forwards see real context. On *color* it lifts agreement
-      0.000 → 0.469 at 2 LM forwards; on *variable* 0.016 → 0.047; on
-      *repeat-3* it stays at 0.000. Still well below `mask_predict@T=0`
-      on color (0.469 vs 1.000 @ 4 LM) and never beats THRML on any
-      template. M4 headline survives the strengthening.
-      `experiments/verify_m5a.py` covers the n_iters=1 distributional
-      sanity check (top-3 token overlap, since MDLM bf16 attention
-      shifts logits ~0.5 max between batch_size=1 and batch_size=64,
-      making exact KL-match unreachable).
+      most-confident hole per chain per iteration. On *color* lifts
+      0.000 → 0.469 at 2 LM forwards; never beats THRML on any template.
+      M4 headline survives the strengthening.)
 - [x] **M5b** — boundary templates (PASS: 328-run sweep across 8
-      families, ~6 min total. Five new families
-      (distance/many-holes/multi-group/distractor/polyseme) plus the
-      original 3 core templates. THRML averages **0.80** agreement
-      across the five M5b families at 1 LM forward vs 0.40 (T=0) /
-      0.28 (T=1) for mask-predict at any budget; bimodal headline.
-      THRML wins by ≥ 0.3 on variable, repeat-3, multi-group,
-      polyseme; ties (≤ 0.1) on color, distance, distractor — all
-      "favorite color is"-style cascadable templates where mp@T=0
-      free-rides committed-argmax. The **many-holes** template is
-      degenerate (all methods 0.000) because top-64 candidate sets at
-      4 different syntactic roles share no common token — a property
-      of the top-k state space, not the joint sampler. See
-      `notebooks/05_boundary.py`, `plots/m5b_{headline,boundary}.png`,
-      `results/results_all.json`. Required chunking
-      `lm_perplexity` and the baseline forwards (16 chains/chunk) so
-      the longer distance template did not OOM the 8 GB GPU.
-- [~] **M5c** — learned EBM correction, **scaffolded and smoke-tested,
-      awaits the A100 day**. Decision matrix locked in: objective =
-      Joint-Transition NCE (positives are corpus pairs, negatives are
-      independent top-k LM-marginal samples at each masked position);
-      encoder = MDLM last hidden state via the new
-      `MDLM.forward_hidden`; corpus = OpenWebText (HF streaming);
-      eval primary = M5b distractor + polyseme. Files:
-      `src/diffusion_ebm/factors/learned.py` (PairwiseScorer with
-      bilinear factorisation `⟨f(h_a, x_i), g(h_b, x_j)⟩` so a full
-      [k, k] pair table is two MLP forwards + one matmul);
-      `src/diffusion_ebm/sampler/thrml_joint_learned.py` (parallel of
-      `thrml_joint.build` swapping the equality table for the learned
-      one); `experiments/m5c_train.py` (data + InfoNCE loop);
-      `experiments/m5c_smoke.py` (300-step synthetic run + eval on
-      color + polyseme; passes locally, 6.3 s); `experiments/m5c_eval.py`
-      (M5b sweep with a trained checkpoint); `notebooks/06_learned.py`
-      (overlay plot vs M5b boundary). Codex review caught one
-      load-bearing bug — `(ids, unary)` swap from `top_k_candidates`
-      in both smoke and eval — now fixed; smoke re-passes. The A100
-      day plan is in `A100_RUNBOOK.md` (≈ 1 h setup, 18 h training,
-      4 h eval).
+      families. Five new families (distance/many-holes/multi-group/
+      distractor/polyseme). THRML averages **0.80** agreement across the
+      five M5b families at 1 LM forward vs 0.40/0.28 for mask-predict.
+      The **many-holes** template is degenerate at k=64 — top-k candidate
+      sets share no common token, a property of the state space not the
+      sampler.)
+- [x] **M5c** — learned EBM correction (COMPLETE after 3 PACE runs on
+      H200). Final configuration: `PairwiseScorer` bilinear ψ
+      `⟨f(h_a, x_i), g(h_b, x_j)⟩`, tabular NCE with full [B, k, k]
+      cross-entropy, repeat-token tier-1 mining, expanded synthetic corpus
+      (~300 seed sentences across variable/name/polyseme/multi-group axes),
+      log_temp clamped to [-1.0, 0.5], synth-frac 0.30→0.10 over 150k
+      steps, k=128 training.
+
+      **v3 + k=256 eval results (step 200k checkpoint, 2026-05-27):**
+
+      | Template | k=128 eval | k=256 eval | Hard-equality THRML |
+      |---|---|---|---|
+      | color | 1.000 | 1.000 | 1.000 |
+      | distractor | 1.000 | 1.000 | 1.000 |
+      | car-boot polyseme | 1.000 | 1.000 | 1.000 |
+      | color-cascade | 1.000 | 1.000 | 1.000 |
+      | variable | 1.000* | 1.000* | 1.000 |
+      | repeat-3 (name) | 0.062 | 0.047 | 0.000 |
+      | **room-polyseme** | 0.000 | **0.656** | 0.000 |
+      | **multi-group** | ~0.000 | **1.000** | 0.000 |
+
+      *Variable "1.000" is agreement on `' variable'`/`' that'` — the
+      true target token `' x'` is outside MDLM's top-256 in prose context
+      (documented top-k support ceiling; not a scorer failure).
+
+      **Key diagnostic finding (C2):** all remaining failures are top-k
+      support bottlenecks, not scorer quality. Room-polyseme and multi-group
+      recovered at k=256 because subject pronouns / proper names entered the
+      candidate set at positions 129-256. Repeat-3 hole 2 (`"I said [M]
+      three times"`) still predicts "it"/"that" — no name token at k=256.
+
+      Artefacts on PACE scratch:
+      - v3 checkpoint: `results/m5c_v3/scorer_step00200000.pt`
+      - v3 eval (k=128 train, k=128 eval): `results/m5c_v3_eval.json`
+      - k=256 eval (k=128 train, k=256 eval): `results/m5c_v3_eval_k256.json`
+
+- [~] **M5d** — publication preparation (EMNLP Findings target, in
+      progress). Staged plan at
+      `/home/ghawk/.claude/plans/shiny-watching-sundae.md`.
+
+      **Stage 0 (current):** Retrain at k=256 natively (`slurm/m5c_train_k256.sbatch`)
+      to eliminate the train/eval k mismatch. Room-polyseme collapsing at
+      ws≥2 at eval k=256 is a calibration artifact — the NCE negatives
+      were normalised over 128 candidates but the eval table is 256-wide.
+
+      **Stage 1:** WinoGrande adapter — first external benchmark. Pronoun
+      resolution with paired antecedents; structurally identical to the
+      two-equal-holes setup. Gate: learned-ψ beats hard-equality and
+      best-of-N by ≥ 3 absolute points.
+
+      **Stage 2:** Two new baselines — `best_of_n` (N=64 ancestral fills
+      ranked by LM log-prob) and `mcmc_logits` (Gibbs with no learned
+      factor, isolating whether the win is joint sampling or learned ψ).
+
+      **Stage 3:** Three seeds + bootstrap CIs on headline metrics.
+
+      **Stage 4:** Wall-clock cost measurement for the Pareto figure.
+
+      **Do not touch:** PairwiseScorer architecture, MDLM backbone, THRML
+      wiring, training objective. Method is locked.
 
 ## Environment quirks (NixOS-specific, **important**)
 
@@ -331,20 +373,40 @@ canonical reference if a future API change confuses things.
   shim earlier and the spec-less fake module failed that probe; current
   approach is to install real flash-attn instead.
 
-## Open questions / decisions deferred
+## Settled questions (previously open)
 
-- **Mask-predict baseline strength** — the strongest baseline at M3.  If it
-  dominates the Pareto front at all budgets, the project pivots to "where
-  in (sparsity × constraint-density) space does Gibbs win" — still
-  publishable.
-- **Equality factor weight** — too small → no effect, too large → freezes
-  Gibbs.  Sweep `equality_weight ∈ {2, 5, 10}` at M3.
-- **Top-k truncation** — high-entropy positions may need k > 64 to keep
-  the gold token in candidates.  Consider top-p (nucleus) candidate sets
-  if k=64 hurts quality; report at multiple k.
-- **Mode mixing in MVP0** — at J=5 the chain locks into one mode.  This is
-  expected and not blocking, but if we ever want to demonstrate mode-mixing
-  we'd need annealing or lower J.
+- **Mask-predict baseline strength** — resolved. mask-predict@T=0 wins on
+  cascadable templates (color, distractor) but fails on templates requiring
+  true joint constraints (variable, multi-group, polyseme). Learned-ψ THRML
+  is the winner there.
+- **Equality factor weight** — resolved. `equality_weight=1.0` with a
+  learned ψ is the working configuration. `weight_scale` in [0.5, 2.0] is
+  the sweet spot; ws≥5 over-constrains and can hurt ppl.
+- **Top-k truncation** — resolved empirically. k=64 is too small (12% miss
+  rate on positive pairs, and room-polyseme/multi-group fail completely).
+  k=128 reduces miss rate to ~11% but still misses pronoun case at hole 3.
+  k=256 (THRML uint8 hard ceiling) unlocks room-polyseme (0.656) and
+  multi-group (1.000). **k=256 is the final training configuration.**
+- **Runaway log_temp** — resolved. v2 hit T=15.5 (log_temp=2.74) via
+  unconstrained learning. v3 clamps log_temp ∈ [-1.0, 0.5] (T ∈ [0.37,
+  1.65]); the model hits the upper clamp by step ~50k and stays there.
+
+## Open questions / M5d decisions pending
+
+- **WinoGrande generalisation** — does learned ψ beat baselines on real
+  pronoun-resolution text, or only on our hand-designed templates? Gate for
+  Stage 1 of M5d.
+- **Variable template framing** — `' x'` is outside MDLM's top-256 in
+  prose context. Current "1.000 agreement" is on `' variable'`/`' that'`.
+  Must be framed as a top-k ceiling example in the paper, not a success.
+  Possible fix: add a code-context variable template where MDLM predicts
+  identifiers; deferred to M5d Stage 1 review.
+- **Repeat-3 hole 2** — `"I said [M] three times"` context predicts
+  "it"/"that", not names, even at k=256. Template may need redesign or
+  drop from primary eval.
+- **k=256 retrain calibration** — does room-polyseme stabilise across all
+  weight-scales when trained natively at k=256 (vs current 0.656 only at
+  ws=0.5)? Answered by the pending `m5c_train_k256.sbatch` run.
 
 ## File-locating tips
 
@@ -354,4 +416,8 @@ canonical reference if a future API change confuses things.
   (function `test_categorical`).
 - MDLM modeling file (downloaded by trust_remote_code):
   `~/.cache/huggingface/hub/models--kuleshov-group--mdlm-owt/snapshots/<hash>/modeling_mdlm.py`
-- The approved plan: `/home/ghawk/.claude/plans/nested-wishing-thimble.md`.
+- M5d plan (active): `/home/ghawk/.claude/plans/shiny-watching-sundae.md`
+- PACE scratch (15 TB): `/storage/scratch1/1/gcomes3/diffusion-ebm/`
+  - v3 checkpoint: `results/m5c_v3/scorer_step00200000.pt`
+  - v3 eval JSONs: `results/m5c_v3_eval.json`, `results/m5c_v3_eval_k256.json`
+  - k=256 retrain output (pending): `results/m5c_v3_k256/`
