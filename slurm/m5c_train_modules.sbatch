@@ -126,6 +126,7 @@ uv run python experiments/m5c_train.py \
     --mlp-dim 1024 \
     --initial-buffer 50000 \
     --refresh-every 0 \
+    --synth-frac 0.05 \
     --log-every 200 \
     --ckpt-every 5000 \
     --ckpt-dir "$RESULTS_DIR/m5c" \

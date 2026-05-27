@@ -88,16 +88,16 @@ class PairwiseScorer(nn.Module):
         x_j_neg: torch.Tensor,    # [B, K] long
     ) -> tuple[torch.Tensor, torch.Tensor]:
         """Return (pos_scores [B], neg_scores [B, K])."""
+        scale = self.head_dim ** 0.5
         feat_a_pos = self._f(h_a, x_i_pos)
         feat_b_pos = self._g(h_b, x_j_pos)
-        pos = (feat_a_pos * feat_b_pos).sum(dim=-1)
+        pos = (feat_a_pos * feat_b_pos).sum(dim=-1) / scale
 
         B, K = x_i_neg.shape
         h_a_exp = h_a.unsqueeze(1).expand(-1, K, -1).reshape(B * K, -1)
         h_b_exp = h_b.unsqueeze(1).expand(-1, K, -1).reshape(B * K, -1)
         feat_a_neg = self._f(h_a_exp, x_i_neg.reshape(-1)).view(B, K, -1)
         feat_b_neg = self._g(h_b_exp, x_j_neg.reshape(-1)).view(B, K, -1)
-        scale = self.head_dim ** 0.5
         neg = (feat_a_neg * feat_b_neg).sum(dim=-1) / scale
         return pos, neg
 

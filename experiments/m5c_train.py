@@ -230,8 +230,14 @@ def _encode_and_negatives(
         if not bool(same.any()):
             break
         resamp_a = torch.multinomial(p_a, neg_k, replacement=True)
-        replace_ids = topk_a_ids.gather(1, resamp_a)
-        x_i_neg = torch.where(same, replace_ids, x_i_neg)
+        resamp_b = torch.multinomial(p_b, neg_k, replacement=True)
+        x_i_neg = torch.where(same, topk_a_ids.gather(1, resamp_a), x_i_neg)
+        x_j_neg = torch.where(same, topk_b_ids.gather(1, resamp_b), x_j_neg)
+
+    # Fraction of positive pairs whose tokens are both inside the top-k support.
+    in_topk_a = (topk_a_ids == pos_i).any(dim=1)
+    in_topk_b = (topk_b_ids == pos_j).any(dim=1)
+    topk_recall = float((in_topk_a & in_topk_b).float().mean())
 
     return {
         "h_a": h_a,
@@ -240,6 +246,7 @@ def _encode_and_negatives(
         "x_j_pos": pb.x_j_pos.to(mdlm.device),
         "x_i_neg": x_i_neg,
         "x_j_neg": x_j_neg,
+        "topk_recall": topk_recall,
     }
 
 
@@ -309,11 +316,27 @@ def train(args: argparse.Namespace) -> None:
     if not tok_docs:
         raise RuntimeError("No valid docs after length filter — check corpus / seq_len")
 
+    # Mix synthetic template docs into the buffer for guaranteed high-MI pairs.
+    if args.synth_frac > 0.0:
+        n_synth = max(1, int(len(tok_docs) * args.synth_frac / (1.0 - args.synth_frac)))
+        synth_raw = _synthetic_docs()
+        synth_tok = _pretokenize_docs(mdlm.tokenizer, synth_raw, args.seq_len)
+        if synth_tok:
+            repeated = (synth_tok * ((n_synth // len(synth_tok)) + 1))[:n_synth]
+            tok_docs.extend(repeated)
+            rng.shuffle(tok_docs)
+            print(
+                f"[m5c] mixed {len(repeated)} synthetic docs "
+                f"({args.synth_frac:.0%} of buffer)",
+                flush=True,
+            )
+
     log: list[dict] = []
     t0 = time.time()
     losses_window: list[float] = []
     accum_loss = 0.0
     last_pos_scores = last_neg_scores = None
+    last_topk_recall = 0.0
     for step in range(1, args.steps + 1):
         scorer.train()
         opt.zero_grad(set_to_none=True)
@@ -341,6 +364,7 @@ def train(args: argparse.Namespace) -> None:
             loss.backward()
             step_loss += float(loss.item())
             last_pos_scores, last_neg_scores = pos_scores.detach(), neg_scores.detach()
+            last_topk_recall = feats["topk_recall"]
         torch.nn.utils.clip_grad_norm_(scorer.parameters(), 1.0)
         opt.step()
 
@@ -359,11 +383,12 @@ def train(args: argparse.Namespace) -> None:
             rate = step / elapsed
             print(
                 f"[m5c] step {step:6d}  loss={avg:.4f}  pos>max_neg={acc:.3f} "
-                f"  {rate:.1f} steps/s",
+                f"  topk_recall={last_topk_recall:.3f}  {rate:.1f} steps/s",
                 flush=True,
             )
             log.append(
-                dict(step=step, loss=avg, acc=acc, time_s=elapsed)
+                dict(step=step, loss=avg, acc=acc,
+                     topk_recall=last_topk_recall, time_s=elapsed)
             )
 
         if step % args.ckpt_every == 0 or step == args.steps:
@@ -420,7 +445,7 @@ def main() -> int:
     p.add_argument("--min-pair-dist", type=int, default=4)
     p.add_argument("--grad-accum", type=int, default=1,
                    help="accumulate gradients over N micro-batches before each optimizer step")
-    p.add_argument("--lr", type=float, default=3e-4)
+    p.add_argument("--lr", type=float, default=1e-4)
     p.add_argument("--wd", type=float, default=0.01)
     p.add_argument("--embed-dim", type=int, default=128)
     p.add_argument("--head-dim", type=int, default=64)
@@ -430,6 +455,8 @@ def main() -> int:
                    help="docs to buffer and pre-tokenise at startup")
     p.add_argument("--refresh-every", type=int, default=0,
                    help="re-fetch N docs from OWT every this many steps (0=disabled)")
+    p.add_argument("--synth-frac", type=float, default=0.05,
+                   help="fraction of buffer to fill with synthetic template docs (0=disabled)")
     p.add_argument("--log-every", type=int, default=20)
     p.add_argument("--ckpt-every", type=int, default=500)
     p.add_argument(
