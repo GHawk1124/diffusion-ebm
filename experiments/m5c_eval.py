@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import sys
 import time
@@ -102,6 +103,15 @@ def main() -> int:
     p.add_argument("--k", type=int, default=64)
     p.add_argument("--seed", type=int, default=0)
     p.add_argument(
+        "--temp-override", type=float, nargs="+", default=None,
+        metavar="LOG_TEMP",
+        help=(
+            "Override log_temp to each value and run a full sweep per value. "
+            "Values are in log-space: -1.0→T=0.37, -0.5→T=0.61, 0.0→T=1.0, "
+            "0.5→T=1.65. If omitted, uses the trained log_temp."
+        ),
+    )
+    p.add_argument(
         "--out",
         type=str,
         default=os.path.join(_REPO_ROOT, "results/m5c_eval.json"),
@@ -111,14 +121,20 @@ def main() -> int:
     print(f"[m5c-eval] loading MDLM…")
     mdlm = MDLM.load()
     scorer = _load_scorer(args.ckpt, mdlm.device)
-    print(f"[m5c-eval] scorer loaded from {args.ckpt}")
+    trained_log_temp = float(scorer.log_temp.detach())
+    print(
+        f"[m5c-eval] scorer loaded from {args.ckpt}  "
+        f"(trained log_temp={trained_log_temp:.3f}, T={math.exp(trained_log_temp):.2f})"
+    )
 
     templates = all_templates(mdlm.tokenizer, family=args.templates)
     records: list[dict] = []
     t_total = time.time()
 
+    # Build MDLM features once per template (shared across all temp sweeps).
+    template_feats: list[dict] = []
     for instance in templates:
-        print(f"[m5c-eval] template: {instance.text[:60]!r}")
+        print(f"[m5c-eval] encoding: {instance.text[:60]!r}")
         logits, hidden = mdlm.forward_hidden(instance.masked_input_ids)
         logits = logits.float()
         ids, unary = mdlm.top_k_candidates(
@@ -126,57 +142,97 @@ def main() -> int:
         )
         ids_holes = ids[0, instance.mask_positions, :]
         unary_holes = unary[0, instance.mask_positions, :]
-        unary_jnp = jnp.asarray(unary_holes.cpu().numpy(), dtype=jnp.float32)
-        ids_jnp = jnp.asarray(ids_holes.cpu().numpy(), dtype=jnp.int32)
-        ids_torch = ids_holes.to(mdlm.device).long()
-        groups = _hole_groups(instance)
-        pair_indices = _all_pairs(groups)
+        template_feats.append(dict(
+            instance=instance,
+            unary_jnp=jnp.asarray(unary_holes.cpu().numpy(), dtype=jnp.float32),
+            ids_jnp=jnp.asarray(ids_holes.cpu().numpy(), dtype=jnp.int32),
+            ids_torch=ids_holes.to(mdlm.device).long(),
+            hidden=hidden[0],
+            groups=_hole_groups(instance),
+            pair_indices=_all_pairs(_hole_groups(instance)),
+        ))
 
-        for ws in args.weight_scales:
-            for burn in args.burn_in:
-                t0 = time.time()
-                sampler = thrml_joint_learned.build(
-                    unary=unary_jnp,
-                    candidate_ids=ids_jnp,
-                    candidate_ids_torch=ids_torch,
-                    hidden=hidden[0],
-                    hole_positions=instance.mask_positions,
-                    pair_indices=pair_indices,
-                    scorer=scorer,
-                    weight_scale=ws,
-                )
-                samples_jnp = thrml_joint_learned.sample(
-                    sampler,
-                    jax.random.PRNGKey(args.seed),
-                    n_chains=N_CHAINS,
-                    burn_in=burn,
-                )
-                samples = torch.from_numpy(np.asarray(samples_jnp)).long()
-                agree = agreement_rate(samples, groups)
-                ppl = float(lm_perplexity(mdlm, samples, instance).mean())
-                wall = time.time() - t0
-                rec = Record(
-                    template=instance.text,
-                    method="thrml_joint_learned",
-                    config=dict(
+    # Determine which log_temp values to sweep.
+    if args.temp_override:
+        override_vals: list[float | None] = list(args.temp_override)
+        print(
+            f"[m5c-eval] temp overrides: {override_vals} "
+            f"(trained={trained_log_temp:.3f})"
+        )
+    else:
+        override_vals = [None]  # use trained log_temp as-is
+
+    for temp_val in override_vals:
+        if temp_val is not None:
+            with torch.no_grad():
+                scorer.log_temp.data.fill_(temp_val)
+            print(
+                f"\n[m5c-eval] === log_temp override {temp_val:.2f} "
+                f"(T={math.exp(temp_val):.2f}) ==="
+            )
+        else:
+            with torch.no_grad():
+                scorer.log_temp.data.fill_(trained_log_temp)
+            print(
+                f"\n[m5c-eval] === trained log_temp {trained_log_temp:.3f} "
+                f"(T={math.exp(trained_log_temp):.2f}) ==="
+            )
+
+        for tf in template_feats:
+            instance = tf["instance"]
+            unary_jnp = tf["unary_jnp"]
+            ids_jnp = tf["ids_jnp"]
+            ids_torch = tf["ids_torch"]
+            groups = tf["groups"]
+            pair_indices = tf["pair_indices"]
+            print(f"[m5c-eval] template: {instance.text[:60]!r}")
+
+            for ws in args.weight_scales:
+                for burn in args.burn_in:
+                    t0 = time.time()
+                    sampler = thrml_joint_learned.build(
+                        unary=unary_jnp,
+                        candidate_ids=ids_jnp,
+                        candidate_ids_torch=ids_torch,
+                        hidden=tf["hidden"],
+                        hole_positions=instance.mask_positions,
+                        pair_indices=pair_indices,
+                        scorer=scorer,
                         weight_scale=ws,
-                        gibbs_sweeps=burn,
-                        k=args.k,
-                        ckpt=os.path.basename(args.ckpt),
-                    ),
-                    n_lm_forwards=1,
-                    n_gibbs_sweeps=burn + N_CHAINS,
-                    n_chains=N_CHAINS,
-                    agreement_rate=agree,
-                    lm_perplexity_mean=ppl,
-                    wall_time_s=wall,
-                    seed=args.seed,
-                )
-                records.append(asdict(rec))
-                print(
-                    f"  ws={ws:5.2f} burn={burn:>4d}  "
-                    f"agree={agree:.3f}  ppl={ppl:5.2f}  t={wall:5.2f}s"
-                )
+                    )
+                    samples_jnp = thrml_joint_learned.sample(
+                        sampler,
+                        jax.random.PRNGKey(args.seed),
+                        n_chains=N_CHAINS,
+                        burn_in=burn,
+                    )
+                    samples = torch.from_numpy(np.asarray(samples_jnp)).long()
+                    agree = agreement_rate(samples, groups)
+                    ppl = float(lm_perplexity(mdlm, samples, instance).mean())
+                    wall = time.time() - t0
+                    rec = Record(
+                        template=instance.text,
+                        method="thrml_joint_learned",
+                        config=dict(
+                            weight_scale=ws,
+                            gibbs_sweeps=burn,
+                            k=args.k,
+                            ckpt=os.path.basename(args.ckpt),
+                            log_temp_override=temp_val,
+                        ),
+                        n_lm_forwards=1,
+                        n_gibbs_sweeps=burn + N_CHAINS,
+                        n_chains=N_CHAINS,
+                        agreement_rate=agree,
+                        lm_perplexity_mean=ppl,
+                        wall_time_s=wall,
+                        seed=args.seed,
+                    )
+                    records.append(asdict(rec))
+                    print(
+                        f"  ws={ws:5.2f} burn={burn:>4d}  "
+                        f"agree={agree:.3f}  ppl={ppl:5.2f}  t={wall:5.2f}s"
+                    )
 
     os.makedirs(os.path.dirname(args.out), exist_ok=True)
     with open(args.out, "w") as f:

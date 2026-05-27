@@ -130,6 +130,8 @@ uv run python experiments/m5c_train.py \
     --synth-frac-start 0.20 \
     --synth-frac-end 0.05 \
     --synth-anneal-steps 50000 \
+    --temp-clamp-min -1.0 \
+    --temp-clamp-max 0.5 \
     --log-every 200 \
     --ckpt-every 5000 \
     --ckpt-dir "$RESULTS_DIR/m5c" \
@@ -150,6 +152,7 @@ if [[ "$RUN_EVAL" == "1" ]]; then
             --templates all \
             --weight-scales 0.5 1.0 2.0 5.0 10.0 \
             --burn-in 100 500 \
+            --temp-override -1.0 -0.5 0.0 0.5 \
             --out "$RESULTS_DIR/m5c_eval.json"
         echo "==> eval done in ${SECONDS}s"
     fi

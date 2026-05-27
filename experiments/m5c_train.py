@@ -500,6 +500,12 @@ def train(args: argparse.Namespace) -> None:
         torch.nn.utils.clip_grad_norm_(scorer.parameters(), 1.0)
         opt.step()
         sched.step()
+        if args.temp_clamp_max is not None or args.temp_clamp_min is not None:
+            with torch.no_grad():
+                scorer.log_temp.data.clamp_(
+                    min=args.temp_clamp_min,
+                    max=args.temp_clamp_max,
+                )
 
         losses_window.append(step_loss)
         window_tier1 += step_tier1
@@ -622,6 +628,10 @@ def main() -> int:
                    default=os.path.join(_REPO_ROOT, "results/m5c"))
     p.add_argument("--resume", type=str, default=None,
                    help="path to a checkpoint to resume from")
+    p.add_argument("--temp-clamp-min", type=float, default=None,
+                   help="lower bound on log_temp after each optimizer step (default: no clamp)")
+    p.add_argument("--temp-clamp-max", type=float, default=None,
+                   help="upper bound on log_temp after each optimizer step (default: no clamp)")
     args = p.parse_args()
     train(args)
     return 0
