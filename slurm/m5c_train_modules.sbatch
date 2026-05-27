@@ -115,18 +115,21 @@ uv run python experiments/m5c_train.py \
     --corpus owt \
     --steps "$STEPS" \
     --batch "$BATCH" \
-    --neg-k 16 \
     --top-k 64 \
     --seq-len 64 \
     --min-pair-dist 4 \
+    --mine-repeats \
     --lr 1e-4 \
     --wd 0.01 \
+    --lr-warmup-steps 1000 \
     --embed-dim 256 \
     --head-dim 128 \
     --mlp-dim 1024 \
     --initial-buffer 50000 \
     --refresh-every 0 \
-    --synth-frac 0.05 \
+    --synth-frac-start 0.20 \
+    --synth-frac-end 0.05 \
+    --synth-anneal-steps 50000 \
     --log-every 200 \
     --ckpt-every 5000 \
     --ckpt-dir "$RESULTS_DIR/m5c" \

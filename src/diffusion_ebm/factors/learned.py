@@ -5,25 +5,30 @@ top-k token set per position, the ``PairwiseScorer`` produces a scalar
 ``ψ(x_i, x_j | context)`` that the THRML factor graph consumes as the
 weight on a categorical edge between two ``CategoricalNode`` blocks.
 
-The training objective is **Joint-Transition NCE** (M5c.1): positives are
-true ``(x_i, x_j)`` from the corpus; negatives are pairs where each
-token is independently high-probability under ``p_LM`` at its masked
-position. The scorer learns to distinguish corpus pairs from
-LM-marginal-resampled pairs — i.e., joint structure beyond the
-per-position conditional.
+The training objective is **Tabular NCE** (M5c.2): for each pair of
+masked positions, compute the full ``[k, k]`` score table and treat the
+cross-entropy over it (with the corpus pair as the positive cell) as the
+loss.  This gives k²−1 implicit negatives per positive, matching the
+inference geometry where THRML consumes the full table.
 
 Architectural notes:
 * The scorer is a **bilinear factorisation**:
-  ``ψ(x_i, x_j) = ⟨f(h_a, x_i), g(h_b, x_j)⟩``.
+  ``ψ(x_i, x_j) = ⟨f(h_a, x_i), g(h_b, x_j)⟩ / (exp(log_temp) · √head_dim)``.
   At inference time, evaluating the full ``[k, k]`` pair table reduces
   to two ``[k, head_dim]`` MLP forwards plus a ``[k, k]`` matmul — the
   cheapest expressive form for THRML's per-edge weight tensor.
 * Token embeddings are tied between the ``f`` and ``g`` heads so a token
   has a single learnable representation regardless of which side of the
   pair it appears on.
-* ``forward(...)`` returns scores for one ``(x_i, x_j)`` per row — the
-  training-loop call site. ``pair_table(...)`` returns the full
-  ``[k_a, k_b]`` matrix used to populate one THRML edge weight.
+* ``log_temp`` is a learnable scalar (initialised to 0 → temperature 1).
+  It controls the sharpness of the k² softmax during training and is
+  baked into ``pair_table`` at eval time so inference uses the trained
+  scale.
+* ``forward(...)`` returns scores for one ``(x_i, x_j)`` per row — used
+  for sanity checks.  ``forward_table(...)`` returns the batched
+  ``[B, k, k]`` matrix used for tabular NCE training.
+  ``pair_table(...)`` returns the single-instance ``[k_a, k_b]`` matrix
+  used to populate one THRML edge weight at inference time.
 """
 
 from __future__ import annotations
@@ -60,6 +65,12 @@ class PairwiseScorer(nn.Module):
             nn.GELU(),
             nn.Linear(mlp_dim, head_dim),
         )
+        # Learnable inverse-temperature (log-space → always positive).
+        self.log_temp = nn.Parameter(torch.zeros(1))
+
+    def _scale(self) -> torch.Tensor:
+        """Reciprocal of (temperature × √head_dim) for score normalisation."""
+        return 1.0 / (self.log_temp.exp() * (self.head_dim ** 0.5))
 
     def _f(self, h: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
         return self.f_head(torch.cat([h, self.token_embed(x)], dim=-1))
@@ -75,31 +86,32 @@ class PairwiseScorer(nn.Module):
         x_j: torch.Tensor,  # [B] long
     ) -> torch.Tensor:
         """Return ψ(x_i, x_j | h_a, h_b), shape [B]."""
-        scale = self.head_dim ** 0.5
-        return (self._f(h_a, x_i) * self._g(h_b, x_j)).sum(dim=-1) / scale
+        return (self._f(h_a, x_i) * self._g(h_b, x_j)).sum(dim=-1) * self._scale()
 
-    def forward_pos_neg(
+    def forward_table(
         self,
-        h_a: torch.Tensor,        # [B, d_h]
-        h_b: torch.Tensor,        # [B, d_h]
-        x_i_pos: torch.Tensor,    # [B] long
-        x_j_pos: torch.Tensor,    # [B] long
-        x_i_neg: torch.Tensor,    # [B, K] long
-        x_j_neg: torch.Tensor,    # [B, K] long
-    ) -> tuple[torch.Tensor, torch.Tensor]:
-        """Return (pos_scores [B], neg_scores [B, K])."""
-        scale = self.head_dim ** 0.5
-        feat_a_pos = self._f(h_a, x_i_pos)
-        feat_b_pos = self._g(h_b, x_j_pos)
-        pos = (feat_a_pos * feat_b_pos).sum(dim=-1) / scale
+        h_a: torch.Tensor,    # [B, d_h]
+        h_b: torch.Tensor,    # [B, d_h]
+        ids_a: torch.Tensor,  # [B, k] long — top-k support at pos_a
+        ids_b: torch.Tensor,  # [B, k] long
+    ) -> torch.Tensor:
+        """Return [B, k, k] score table; gradient enabled.
 
-        B, K = x_i_neg.shape
-        h_a_exp = h_a.unsqueeze(1).expand(-1, K, -1).reshape(B * K, -1)
-        h_b_exp = h_b.unsqueeze(1).expand(-1, K, -1).reshape(B * K, -1)
-        feat_a_neg = self._f(h_a_exp, x_i_neg.reshape(-1)).view(B, K, -1)
-        feat_b_neg = self._g(h_b_exp, x_j_neg.reshape(-1)).view(B, K, -1)
-        neg = (feat_a_neg * feat_b_neg).sum(dim=-1) / scale
-        return pos, neg
+        Used for tabular NCE training: cross-entropy over the flattened k²
+        logits with the positive cell (pos_a_rank, pos_b_rank) as the target.
+        """
+        B, k = ids_a.shape
+        h_a_exp = h_a.unsqueeze(1).expand(-1, k, -1)   # [B, k, d_h]
+        h_b_exp = h_b.unsqueeze(1).expand(-1, k, -1)
+        emb_a = self.token_embed(ids_a)                  # [B, k, d_e]
+        emb_b = self.token_embed(ids_b)
+        F = self.f_head(
+            torch.cat([h_a_exp, emb_a], dim=-1).view(B * k, -1)
+        ).view(B, k, -1)                                 # [B, k, head_dim]
+        G = self.g_head(
+            torch.cat([h_b_exp, emb_b], dim=-1).view(B * k, -1)
+        ).view(B, k, -1)                                 # [B, k, head_dim]
+        return (F @ G.transpose(-1, -2)) * self._scale() # [B, k, k]
 
     @torch.no_grad()
     def pair_table(
@@ -119,7 +131,7 @@ class PairwiseScorer(nn.Module):
         hb_exp = h_b.unsqueeze(0).expand(k_b, -1)
         fa = self._f(ha_exp, ids_a)  # [k_a, head_dim]
         gb = self._g(hb_exp, ids_b)  # [k_b, head_dim]
-        return fa @ gb.T / (self.head_dim ** 0.5)  # [k_a, k_b]
+        return (fa @ gb.T) * self._scale()  # [k_a, k_b]
 
 
 def stack_learned_factor(
