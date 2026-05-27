@@ -55,7 +55,7 @@ fi
 RESULTS_DIR="${RESULTS_DIR:-$OUT_DIR/results}"
 PLOTS_DIR="${PLOTS_DIR:-$OUT_DIR/plots}"
 
-mkdir -p "$RESULTS_DIR/m5c" "$PLOTS_DIR"
+mkdir -p "$RESULTS_DIR/m5c_v3" "$PLOTS_DIR"
 
 # ----- modules ---------------------------------------------------------------
 module load cuda/12.6.1 python/3.12.5
@@ -115,7 +115,7 @@ uv run python experiments/m5c_train.py \
     --corpus owt \
     --steps "$STEPS" \
     --batch "$BATCH" \
-    --top-k 64 \
+    --top-k 128 \
     --seq-len 64 \
     --min-pair-dist 4 \
     --mine-repeats \
@@ -134,14 +134,14 @@ uv run python experiments/m5c_train.py \
     --temp-clamp-max 0.5 \
     --log-every 200 \
     --ckpt-every 5000 \
-    --ckpt-dir "$RESULTS_DIR/m5c" \
+    --ckpt-dir "$RESULTS_DIR/m5c_v3" \
     --seed "$SEED"
 echo "==> training done in $((SECONDS / 60)) min"
 echo
 
 # ----- eval ------------------------------------------------------------------
 if [[ "$RUN_EVAL" == "1" ]]; then
-    CKPT="$(ls -t "$RESULTS_DIR/m5c"/scorer_step*.pt 2>/dev/null | head -1 || true)"
+    CKPT="$(ls -t "$RESULTS_DIR/m5c_v3"/scorer_step*.pt 2>/dev/null | head -1 || true)"
     if [[ -z "$CKPT" ]]; then
         echo "warn: no checkpoint found, skipping eval" >&2
     else
@@ -152,14 +152,15 @@ if [[ "$RUN_EVAL" == "1" ]]; then
             --templates all \
             --weight-scales 0.5 1.0 2.0 5.0 10.0 \
             --burn-in 100 500 \
+            --k 128 \
             --temp-override -1.0 -0.5 0.0 0.5 \
-            --out "$RESULTS_DIR/m5c_eval.json"
+            --out "$RESULTS_DIR/m5c_v3_eval.json"
         echo "==> eval done in ${SECONDS}s"
     fi
 fi
 
 echo "================================================================"
 echo "  finished:  $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-echo "  artefacts: $RESULTS_DIR/m5c/scorer_step*.pt"
-echo "             $RESULTS_DIR/m5c_eval.json"
+echo "  artefacts: $RESULTS_DIR/m5c_v3/scorer_step*.pt"
+echo "             $RESULTS_DIR/m5c_v3_eval.json"
 echo "================================================================"

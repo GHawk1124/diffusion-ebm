@@ -142,6 +142,17 @@ def main() -> int:
         )
         ids_holes = ids[0, instance.mask_positions, :]
         unary_holes = unary[0, instance.mask_positions, :]
+
+        # C2 diagnostic: show top-5 candidates at each hole so we can tell
+        # whether top-k support (not scorer signal) is the bottleneck.
+        for hole_idx in range(ids_holes.shape[0]):
+            top5_ids = ids_holes[hole_idx, :5].tolist()
+            top5_toks = [repr(mdlm.tokenizer.decode([tid])) for tid in top5_ids]
+            print(
+                f"  hole {hole_idx}: top-5 = [{', '.join(top5_toks)}]"
+                f"  (k={args.k})"
+            )
+
         template_feats.append(dict(
             instance=instance,
             unary_jnp=jnp.asarray(unary_holes.cpu().numpy(), dtype=jnp.float32),

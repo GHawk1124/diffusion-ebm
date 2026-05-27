@@ -105,23 +105,108 @@ def _make_stop_ids(tokenizer) -> set[int]:
 
 
 def _synthetic_docs() -> list[str]:
-    """Tiny corpus for smoke testing — no network."""
-    sentences = [
-        "Alice's favorite color is blue. Bob's favorite color is also blue.",
-        "The variable x was assigned the value 7. Later, x was used in a loop.",
-        "My name is Sam. You can call me Sam. I said Sam three times.",
-        "The cat sat on the mat. The cat looked at the dog later that day.",
+    """Expanded synthetic corpus — hybrid programmatic + curated, ~300 seed sentences.
+
+    Four axes targeting the v2 failure modes diagnosed in A3:
+      1. Variable names  — programmatic (21 identifiers × 5 phrasings = 105 sentences)
+      2. Person names    — programmatic (20 names × 5 phrasings = 100 sentences)
+      3. Polyseme pairs  — hand-curated (21 sentences, same token two senses)
+      4. Multi-group     — programmatic/curated (64 + 6 = 70 sentences)
+
+    Tokenisation note: all templates place repeat tokens in space-prefixed
+    positions so GPT-2 assigns the same token ID to both occurrences, enabling
+    tier-1 pair mining (ids[a] == ids[b]).
+    """
+    # ---- Axis 1: variable names (programmatic) --------------------------------
+    _VARS = [
+        "x", "y", "z", "n", "m", "i", "j", "k", "s", "t",
+        "p", "q", "r", "v", "w", "f", "c", "e", "g", "h", "d",
+    ]
+    _VAR_PHRASINGS = [
+        "Let {v} = 5. The function returns {v} + 1 as the result.",
+        "We set {v} to zero. Each iteration increments {v} by one.",
+        "Initialize {v} at the start. After the loop, {v} holds the final count.",
+        "The counter {v} starts low. When {v} exceeds the threshold, we stop.",
+        "Define {v} = 10. Then {v} is passed to the helper function.",
+    ]
+    var_sentences = [p.format(v=v) for v in _VARS for p in _VAR_PHRASINGS]
+
+    # ---- Axis 2: person names (programmatic) ----------------------------------
+    _NAMES = [
+        "Maria", "Carlos", "Ana", "Diego", "Sofia", "Luis", "Elena", "Marco",
+        "Lucia", "Pablo", "Sarah", "Daniel", "Rachel", "Thomas", "Hannah",
+        "Oliver", "Emma", "Henry", "Grace", "James",
+    ]
+    _NAME_PHRASINGS = [
+        "{n} arrived first. The team waited for {n} to begin the meeting.",
+        "They called him {n}. Everyone knew {n} from the old neighborhood.",
+        "{n} stepped forward calmly. A moment later {n} spoke to the crowd.",
+        "The letter was addressed to {n}. Without hesitation, {n} opened it.",
+        "{n} had been quiet all evening. Then {n} suddenly stood up.",
+    ]
+    name_sentences = [p.format(n=name) for name in _NAMES for p in _NAME_PHRASINGS]
+
+    # ---- Axis 3: polyseme pairs (hand-curated) --------------------------------
+    polyseme_sentences = [
+        # Keep original car-boot (works in v2).
         "She packed her bag into the car's boot. Then she put a sturdy leather boot on her foot.",
-        "He needed cash from the bank. He sat down by the river bank to think.",
+        # New polyseme pairs: same surface token, two different senses.
+        "He drew a line on the map. The new policy crossed a line that day.",
+        "The spring in the clock had broken. She loved the spring season most.",
+        "He withdrew cash from the bank. He sat on the river bank to rest.",
         "The astronomer saw a distant star. The actor walked the carpet like a star.",
-        "Alice greeted Bob warmly. Bob waved at Alice across the crowded room.",
+        "She booked a flight at dawn. The fugitive had taken flight overnight.",
+        "The pitcher threw a curve ball. He filled the pitcher with cold water.",
+        "The bat flew out of the cave. He swung the bat with both hands.",
+        "She locked the trunk of the car. An elephant raised its trunk high.",
+        "He needed a new mouse for the computer. The cat chased the mouse across the floor.",
+        "She pressed her palm against the wall. The palm tree swayed in the warm breeze.",
+        "The seal on the envelope was broken. A seal rested on the rocky shore.",
+        "He offered a bow to the audience. She noticed the bow tied in her hair.",
+        "The mole in the garden had burrowed deep. The spy was later identified as a mole.",
+        "She ordered a mint chocolate dessert. The mint grew wild along the garden path.",
+        "He cast a spell on the audience. She checked the spell carefully in the dictionary.",
+        "He tightened his tie before the interview. The tie between the two teams was broken.",
+        "She found a well behind the old house. He replied that he was doing quite well.",
+        "The scale tipped in her favor. She played a musical scale slowly on the piano.",
+        "The wave crashed against the shore. She gave a friendly wave as she left the room.",
+        "He measured the yard with a tape. The dog ran freely across the yard.",
+    ]
+
+    # ---- Axis 4: multi-group templates (programmatic + curated) ---------------
+    # Each sentence has two independent equality pairs: name + city.
+    _MG_NAMES = ["Ada", "Carlos", "Maria", "Anna", "Leo", "Rosa", "Max", "Elena"]
+    _MG_CITIES = ["London", "Madrid", "Paris", "Berlin", "Rome", "Vienna", "Prague", "Lisbon"]
+    _MG_ROLES = [
+        "author", "painter", "architect", "detective",
+        "composer", "scientist", "poet", "philosopher",
+    ]
+    _MG_TEMPLATES = [
+        "The {role} {name} was born in {city}. {name} later wrote about {city} at length.",
+        "The {role} {name} lived and worked in {city}. {name} rarely left {city} for long.",
+    ]
+    multi_group_sentences: list[str] = []
+    for name_idx, name in enumerate(_MG_NAMES):
+        for city_idx, city in enumerate(_MG_CITIES):
+            role = _MG_ROLES[(name_idx + city_idx) % len(_MG_ROLES)]
+            tmpl = _MG_TEMPLATES[(name_idx * 3 + city_idx) % len(_MG_TEMPLATES)]
+            multi_group_sentences.append(tmpl.format(name=name, city=city, role=role))
+    # Original seed sentences (keep for continuity).
+    multi_group_sentences += [
+        "Alice's favorite color is blue. Bob's favorite color is also blue.",
+        "The cat sat on the mat. The cat looked at the dog later that day.",
         "The book was on the shelf. The shelf was made of dark wood and stood by the window.",
         "She wrote her name on the form. The form was sent to the office downtown.",
+        "My name is Sam. You can call me Sam. I said Sam three times.",
+        "Alice greeted Bob warmly. Bob waved at Alice across the crowded room.",
     ]
+
+    all_sentences = var_sentences + name_sentences + polyseme_sentences + multi_group_sentences
+
     docs: list[str] = []
-    for i in range(512):
+    for i in range(5000):
         rng = random.Random(i)
-        doc = " ".join(rng.sample(sentences, k=4))
+        doc = " ".join(rng.sample(all_sentences, k=6))
         docs.append(doc)
     return docs
 
