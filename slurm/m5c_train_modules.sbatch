@@ -127,9 +127,9 @@ uv run python experiments/m5c_train.py \
     --mlp-dim 1024 \
     --initial-buffer 50000 \
     --refresh-every 0 \
-    --synth-frac-start 0.20 \
-    --synth-frac-end 0.05 \
-    --synth-anneal-steps 50000 \
+    --synth-frac-start 0.30 \
+    --synth-frac-end 0.10 \
+    --synth-anneal-steps 150000 \
     --temp-clamp-min -1.0 \
     --temp-clamp-max 0.5 \
     --log-every 200 \
