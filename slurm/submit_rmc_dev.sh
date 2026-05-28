@@ -36,6 +36,7 @@ submit_shard() {
         sbatch \
             --partition="$partition" \
             --gres="gpu:${gpu}:1" \
+            --cpus-per-task=4 \
             --time="$WALLTIME" \
             --export=ALL,DEV_ONLY=1,CORPUS="$corpus",TRACK="$track",MAX_ITEMS="$MAX_ITEMS" \
             "$SBATCH_SCRIPT"
