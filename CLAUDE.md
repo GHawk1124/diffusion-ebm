@@ -114,18 +114,34 @@ diffusion-ebm/
     07_tour.py                 # demo tour
     08_tour_marimo.py          # marimo interactive version
 
+  data/
+    rmc/                       # frozen benchmark artefacts (committed)
+      owt_heldout_single.jsonl
+      owt_heldout_multi.jsonl
+      wikitext103_single.jsonl
+      wikitext103_multi.jsonl
+
   experiments/
     run_pareto.py              # M4: sweep driver
     verify_m5a.py              # M5a: distributional sanity check
     m5c_smoke.py               # M5c: 300-step synth train + pipeline check
     m5c_train.py               # M5c: OWT + synth training loop
     m5c_eval.py                # M5c: full template sweep with --temp-override
+    m5c_eval_winogrande.py     # M5d Stage 1 (WG, out-of-scope; appendix)
+    build_rmc.py               # M5d Stage 1': deterministic RMC extractor
+    m5c_eval_rmc.py            # M5d Stage 1': RMC eval script (to create)
+
+  src/diffusion_ebm/tasks/
+    winogrande.py              # WG dataclass + build_items (appendix material)
+    rmc.py                     # RMC dataclass + load_items + is_dev split
 
   slurm/
     m5c_train_modules.sbatch   # v3 training job (k=128, 200k steps)
     m5c_train_k256.sbatch      # v3 k=256 retrain (THRML uint8 ceiling)
     m5c_eval_override.sbatch   # A3 temp-override eval (historical)
     m5c_eval_k256.sbatch       # k=256 eval on existing checkpoint
+    m5c_eval_winogrande.sbatch # Stage 1 WG eval (appendix; do not delete)
+    m5c_eval_rmc.sbatch        # Stage 1' RMC eval (to create)
 
   plots/                       # gitignored
   results/                     # gitignored; PACE scratch at
@@ -210,21 +226,47 @@ diffusion-ebm/
       progress). Staged plan at
       `/home/ghawk/.claude/plans/shiny-watching-sundae.md`.
 
-      **Stage 0 (current):** Retrain at k=256 natively (`slurm/m5c_train_k256.sbatch`)
-      to eliminate the train/eval k mismatch. Room-polyseme collapsing at
-      ws≥2 at eval k=256 is a calibration artifact — the NCE negatives
-      were normalised over 128 candidates but the eval table is 256-wide.
+      **Stage 0 (k=256 native retrain) — COMPLETE.**
+      `slurm/m5c_train_k256.sbatch` ran on H200 for 175 min (200k steps).
+      All 8 templates → 1.000 agreement at some ws; three genuine wins over
+      hard-equality (which scores 0.000 by construction on these):
+      repeat-3 (name), room-polyseme, multi-group.
+      Checkpoint: `results/m5c_v3_k256/scorer_step00200000.pt`
+      Eval JSON: `results/m5c_v3_k256_eval.json`
 
-      **Stage 1:** WinoGrande adapter — first external benchmark. Pronoun
-      resolution with paired antecedents; structurally identical to the
-      two-equal-holes setup. Gate: learned-ψ beats hard-equality and
-      best-of-N by ≥ 3 absolute points.
+      **Stage 1 (WinoGrande forced-choice rerank) — FAILED, reframed.**
+      Pilot (100 items) + full run (1082 items after length-mismatch drop):
+      best psi_rerank (ws=1.0) = 0.507, lm_rerank = 0.491. Gate was +3 pp;
+      achieved only +1.6 pp. Diagnosis (confirmed via gpt-5.5-xhigh codex):
+      ψ encodes *identity* consistency (tabular NCE + repeat-token mining),
+      WG measures *reference* consistency (pronoun → distinct antecedent).
+      Additionally, the WG rerank adapter sums ψ(option, nearby_context)
+      with no joint Gibbs — it never exercises the method's core inference
+      claim. Reframed as out-of-scope appendix material.
+
+      **Stage 1' (Repeated Mention Cloze, RMC) — IN PROGRESS.**
+      10-day time-box, Day-7 dev gate. Real-corpus benchmark where same
+      single-token entity appears ≥ 2 times in a 64-token window; all
+      occurrences masked; method must recover jointly.
+      Two tracks: `single_chain` (one entity; hard-eq is upper bound) and
+      `multi_chain` (2–4 entities; global hard-eq insufficient, ψ must work).
+      Corpora: OWT held-out (last 1000 docs by HF ordering) + WikiText-103
+      validation. Frozen .jsonl artefacts in `data/rmc/`.
+      Day-7 gate: learned_psi_thrml `chain_em_supported` ≥ mdlm_argmax +5 pp
+      on `multi_chain` for ≥1 corpus AND ties hard_eq_oracle within 3 pp
+      on `single_chain`. If gate fails → Stage 1'' (Option E: retrain ψ).
+
+      **Stage 1'' (ψ retrain with broader positives) — reserve fallback.**
+      Entry condition: Stage 1' Day-7 gate fails. Expand tier-1 mining to
+      include pronoun-antecedent pairs via capitalisation heuristics. 3-week
+      time-box; risks ARR Aug 2026, retargets ARR Dec 2026 / ACL 2027.
 
       **Stage 2:** Two new baselines — `best_of_n` (N=64 ancestral fills
       ranked by LM log-prob) and `mcmc_logits` (Gibbs with no learned
       factor, isolating whether the win is joint sampling or learned ψ).
 
-      **Stage 3:** Three seeds + bootstrap CIs on headline metrics.
+      **Stage 3:** Three seeds + bootstrap CIs on RMC headline metrics.
+      Item-level bootstrap (NOT chain-level — chains are autocorrelated).
 
       **Stage 4:** Wall-clock cost measurement for the Pareto figure.
 
@@ -390,12 +432,20 @@ canonical reference if a future API change confuses things.
 - **Runaway log_temp** — resolved. v2 hit T=15.5 (log_temp=2.74) via
   unconstrained learning. v3 clamps log_temp ∈ [-1.0, 0.5] (T ∈ [0.37,
   1.65]); the model hits the upper clamp by step ~50k and stays there.
+- **ψ scope: identity vs reference consistency** — resolved. ψ encodes
+  *identity* consistency (same surface token at multiple masked positions),
+  NOT *reference* consistency (pronoun → distinct antecedent). This is
+  set by the tabular NCE + repeat-token mining objective.  WinoGrande
+  (pronoun resolution) is out of scope.  Expanding to reference consistency
+  would require a retrain (Stage 1'' / Option E).
 
 ## Open questions / M5d decisions pending
 
-- **WinoGrande generalisation** — does learned ψ beat baselines on real
-  pronoun-resolution text, or only on our hand-designed templates? Gate for
-  Stage 1 of M5d.
+- **RMC Day-7 dev gate** — does ψ+THRML exceed MDLM argmax on
+  `multi_chain chain_em_supported` by ≥ 5 pp on at least one corpus,
+  AND tie `hard_eq_thrml_oracle` within 3 pp on `single_chain`?
+  (WinoGrande generalisation question closed — reframed as scope mismatch;
+  see Stage 1 failure note above.)
 - **Variable template framing** — `' x'` is outside MDLM's top-256 in
   prose context. Current "1.000 agreement" is on `' variable'`/`' that'`.
   Must be framed as a top-k ceiling example in the paper, not a success.
@@ -420,4 +470,7 @@ canonical reference if a future API change confuses things.
 - PACE scratch (15 TB): `/storage/scratch1/1/gcomes3/diffusion-ebm/`
   - v3 checkpoint: `results/m5c_v3/scorer_step00200000.pt`
   - v3 eval JSONs: `results/m5c_v3_eval.json`, `results/m5c_v3_eval_k256.json`
-  - k=256 retrain output (pending): `results/m5c_v3_k256/`
+  - k=256 native retrain checkpoint: `results/m5c_v3_k256/scorer_step00200000.pt`
+  - k=256 native retrain eval: `results/m5c_v3_k256_eval.json`
+  - RMC eval outputs (to create): `results/m5c_v3_k256_rmc_{owt_heldout,wikitext103}_{dev,test}.json`
+- RMC frozen benchmark artefacts: `data/rmc/*.jsonl` (in repo, committed)
