@@ -19,7 +19,10 @@ Methods:
                           by sum log-marginal.
   hard_eq_thrml_oracle — THRML hard equality per identity chain (oracle labels).
   hard_eq_thrml_global — THRML hard equality over all mask positions (naïve).
-  learned_psi_thrml    — locked ψ+THRML, ws sweep × burn_in sweep.
+  learned_psi_thrml    — locked ψ+THRML, oracle chain grouping, ws × burn sweep.
+  learned_psi_thrml_global — locked ψ+THRML over ALL hole pairs, NO oracle
+                          grouping (multi_chain only); tests whether the
+                          learned factor recovers identity structure unaided.
 
 Run (dev split, Day-7 gate):
     uv run python experiments/m5c_eval_rmc.py \\
@@ -44,6 +47,7 @@ import argparse
 import json
 import math
 import os
+import random
 import sys
 import time
 from collections import Counter, defaultdict
@@ -221,6 +225,8 @@ def evaluate_item(
     oracle_groups = _oracle_eq_groups(item)
     global_groups = [list(range(n_holes))]
     psi_pairs = _all_pairs_within(oracle_groups)
+    psi_pairs_global = _all_pairs_within(global_groups)
+    n_entity_chains = max(item.chain_labels) + 1
 
     rng_key = jax.random.PRNGKey(seed)
     records: list[Record] = []
@@ -354,6 +360,41 @@ def evaluate_item(
                 metrics_psi, n_lm=1, wall=mdlm_forward_time + (time.time() - t1),
             ))
 
+    # ── learned_psi_thrml_global ─────────────────────────────────────────
+    # ψ over ALL hole pairs with no oracle chain grouping: the scorer alone
+    # must promote within-entity agreement and suppress cross-entity. This is
+    # the only cell that tests whether the *learned* factor recovers identity
+    # structure that hard equality can only get from oracle labels. For
+    # single_chain global == oracle, so skip (would be a redundant copy).
+    if not gate_only and n_entity_chains > 1:
+        for ws in weight_scales:
+            for burn in burn_ins:
+                t1 = time.time()
+                samp_psi_g = thrml_joint_learned.build(
+                    unary=unary_jnp,
+                    candidate_ids=cand_jnp,
+                    candidate_ids_torch=cand_torch,
+                    hidden=hidden_1d,
+                    hole_positions=mask_pos,
+                    pair_indices=psi_pairs_global,
+                    scorer=scorer,
+                    weight_scale=ws,
+                )
+                samples_psi_g_jnp = thrml_joint_learned.sample(
+                    samp_psi_g, rng_key, n_chains=N_CHAINS, burn_in=burn,
+                )
+                samples_psi_g = np.asarray(samples_psi_g_jnp).tolist()
+                pred_psi_g = _majority_vote(samples_psi_g)
+                metrics_psi_g = _compute_metrics(pred_psi_g, item, topk_sets,
+                                                 all_samples=samples_psi_g)
+                records.append(_make_record(
+                    "learned_psi_thrml_global",
+                    {"weight_scale": ws, "burn_in": burn,
+                     "n_chains": N_CHAINS, "k": k},
+                    metrics_psi_g, n_lm=1,
+                    wall=mdlm_forward_time + (time.time() - t1),
+                ))
+
     return records
 
 
@@ -427,8 +468,16 @@ def main() -> int:
                    help="Run only the 3 gate-relevant methods: mdlm_argmax, "
                         "hard_eq_thrml_oracle, learned_psi_thrml. "
                         "Skips mask_predict_T0, best_of_n_cheap, hard_eq_thrml_global.")
+    p.add_argument("--corpus", default="both",
+                   choices=["both", "owt_heldout", "wikitext103"],
+                   help="Restrict to one corpus (for sharded jobs)")
+    p.add_argument("--track", default="both",
+                   choices=["both", "single_chain", "multi_chain"],
+                   help="Restrict to one track (for sharded jobs)")
+    p.add_argument("--subsample-seed", type=int, default=0,
+                   help="Seed for the deterministic shuffle applied before --max-items")
     p.add_argument("--max-items", type=int, default=None,
-                   help="Cap items per corpus×track (for smoke testing)")
+                   help="Cap items per corpus×track (deterministic random subsample)")
     p.add_argument("--out", default="results/m5c_rmc_eval.json")
     args = p.parse_args()
 
@@ -466,7 +515,11 @@ def main() -> int:
     t_total = time.time()
 
     for corpus_tag, path_single, path_multi in corpora:
+        if args.corpus != "both" and corpus_tag != args.corpus:
+            continue
         for track, path in [("single_chain", path_single), ("multi_chain", path_multi)]:
+            if args.track != "both" and track != args.track:
+                continue
             print(f"\n[rmc-eval] === {corpus_tag}/{track} ===")
             items = load_items(path)
 
@@ -480,8 +533,11 @@ def main() -> int:
                 print(f"[rmc-eval]   full set: {len(items)} items")
 
             if args.max_items is not None:
+                rng = random.Random(args.subsample_seed)
+                rng.shuffle(items)
                 items = items[:args.max_items]
-                print(f"[rmc-eval]   (capped to {len(items)})")
+                print(f"[rmc-eval]   (random subsample to {len(items)}, "
+                      f"seed={args.subsample_seed})")
 
             for idx, item in enumerate(items):
                 recs = evaluate_item(

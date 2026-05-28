@@ -53,7 +53,18 @@ if [[ -z "$CKPT" ]]; then
     exit 1
 fi
 
+# Split selection — three-state, no silent dev/test mixing.
+#   SPLIT=test | dev | full   (default: test)
+# DEV_ONLY=1 kept as a legacy alias for SPLIT=dev.
+SPLIT="${SPLIT:-test}"
 DEV_ONLY="${DEV_ONLY:-0}"
+if [[ "$DEV_ONLY" == "1" ]]; then SPLIT="dev"; fi
+
+# Optional per-shard filters (default: all corpora / both tracks).
+CORPUS="${CORPUS:-both}"          # both | owt_heldout | wikitext103
+TRACK="${TRACK:-both}"            # both | single_chain | multi_chain
+SUBSAMPLE_SEED="${SUBSAMPLE_SEED:-0}"
+
 MAX_ITEMS="${MAX_ITEMS:-}"
 # Tune these to trade speed vs coverage.  Defaults = full sweep.
 WEIGHT_SCALES="${WEIGHT_SCALES:-0.5 1.0 2.0 5.0}"
@@ -73,13 +84,18 @@ else
     GATE_ONLY_ARG=""
 fi
 
-if [[ "$DEV_ONLY" == "1" ]]; then
-    RUN_TAG="dev"
-    SPLIT_ARG="--dev-only"
-else
-    RUN_TAG="test"
-    SPLIT_ARG=""
-fi
+case "$SPLIT" in
+    dev)  RUN_TAG="dev";  SPLIT_ARG="--dev-only"  ;;
+    test) RUN_TAG="test"; SPLIT_ARG="--test-only" ;;
+    full) RUN_TAG="full"; SPLIT_ARG=""            ;;
+    *) echo "fatal: SPLIT=$SPLIT (want test|dev|full)" >&2; exit 1 ;;
+esac
+
+# Embed corpus/track in the tag so each shard writes a unique JSON.
+CORPUS_ARG=""
+TRACK_ARG=""
+if [[ "$CORPUS" != "both" ]]; then RUN_TAG="${RUN_TAG}_${CORPUS}"; CORPUS_ARG="--corpus $CORPUS"; fi
+if [[ "$TRACK"  != "both" ]]; then RUN_TAG="${RUN_TAG}_${TRACK}";  TRACK_ARG="--track $TRACK";  fi
 
 if [[ -n "$MAX_ITEMS" ]]; then
     RUN_TAG="${RUN_TAG}_smoke${MAX_ITEMS}"
@@ -111,6 +127,9 @@ uv run python experiments/m5c_eval_rmc.py \
     --burn-in $BURN_IN \
     --k 256 \
     $SPLIT_ARG \
+    $CORPUS_ARG \
+    $TRACK_ARG \
+    --subsample-seed "$SUBSAMPLE_SEED" \
     $MAX_ITEMS_ARG \
     $GATE_ONLY_ARG \
     --out "$OUT_FILE"
