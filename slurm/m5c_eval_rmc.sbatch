@@ -55,6 +55,9 @@ fi
 
 DEV_ONLY="${DEV_ONLY:-0}"
 MAX_ITEMS="${MAX_ITEMS:-}"
+# Tune these to trade speed vs coverage.  Defaults = full sweep.
+WEIGHT_SCALES="${WEIGHT_SCALES:-0.5 1.0 2.0 5.0}"
+BURN_IN="${BURN_IN:-100 500}"
 
 module load cuda/12.6.1 python/3.12.5
 export PATH="$HOME/.local/bin:$PATH"
@@ -97,8 +100,8 @@ SECONDS=0
 uv run python experiments/m5c_eval_rmc.py \
     --ckpt "$CKPT" \
     --data-dir "$REPO/data/rmc" \
-    --weight-scales 0.5 1.0 2.0 5.0 \
-    --burn-in 100 500 \
+    --weight-scales $WEIGHT_SCALES \
+    --burn-in $BURN_IN \
     --k 256 \
     $SPLIT_ARG \
     $MAX_ITEMS_ARG \

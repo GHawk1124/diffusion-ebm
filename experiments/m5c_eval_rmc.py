@@ -430,6 +430,16 @@ def main() -> int:
         print("fatal: --dev-only and --test-only are mutually exclusive", file=sys.stderr)
         return 1
 
+    if torch.cuda.is_available():
+        sm = torch.cuda.get_device_capability()
+        if sm[0] < 8:
+            print(
+                f"fatal: GPU SM {sm[0]}.{sm[1]} < 8.0 — bf16 Triton kernels "
+                "require Ampere+ (A100/L40s/H200). Resubmit to an SM 8.0+ partition.",
+                file=sys.stderr,
+            )
+            return 1
+
     print("[rmc-eval] loading MDLM…")
     mdlm = MDLM.load()
 
