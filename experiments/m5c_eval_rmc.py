@@ -189,6 +189,7 @@ def evaluate_item(
     burn_ins: list[int],
     k: int,
     seed: int,
+    gate_only: bool = False,
 ) -> list[Record]:
     """Run all methods on one RMC item. Returns list of Records."""
     device = mdlm.device
@@ -247,38 +248,39 @@ def evaluate_item(
     ))
 
     # ── mask_predict_T0 ──────────────────────────────────────────────────
-    t1 = time.time()
-    filled = mdlm.mask_predict(item.masked_input_ids, n_iters=4, temperature=0.0)
-    pred_mp = [filled[0, pos].item() for pos in mask_pos]
-    metrics_mp = _compute_metrics(pred_mp, item, topk_sets)
-    records.append(_make_record(
-        "mask_predict_T0", {"n_iters": 4, "temperature": 0.0}, metrics_mp,
-        n_lm=5, wall=time.time() - t1,  # 1 mdlm_forward already done + 4 iters
-    ))
+    if not gate_only:
+        t1 = time.time()
+        filled = mdlm.mask_predict(item.masked_input_ids, n_iters=4, temperature=0.0)
+        pred_mp = [filled[0, pos].item() for pos in mask_pos]
+        metrics_mp = _compute_metrics(pred_mp, item, topk_sets)
+        records.append(_make_record(
+            "mask_predict_T0", {"n_iters": 4, "temperature": 0.0}, metrics_mp,
+            n_lm=5, wall=time.time() - t1,
+        ))
 
     # ── best_of_n_cheap ──────────────────────────────────────────────────
-    t1 = time.time()
-    gen = torch.Generator(device="cpu").manual_seed(seed)
-    probs_at_masks = F.softmax(logits_at_masks.cpu(), dim=-1)  # [n_holes, V]
-    # Sample N_BON complete fills
-    fills = torch.multinomial(
-        probs_at_masks.view(n_holes, -1).repeat(1, 1),
-        N_BON, replacement=True, generator=gen,
-    )  # [n_holes, N_BON]
-    fills = fills.T  # [N_BON, n_holes]
-    log_p = F.log_softmax(logits_at_masks.cpu(), dim=-1)  # [n_holes, V]
-    scores = log_p[
-        torch.arange(n_holes).unsqueeze(0),
-        fills,
-    ].sum(dim=-1)  # [N_BON]
-    best_idx = scores.argmax().item()
-    pred_bon = fills[best_idx].tolist()
-    all_bon = fills.tolist()
-    metrics_bon = _compute_metrics(pred_bon, item, topk_sets, all_samples=all_bon)
-    records.append(_make_record(
-        "best_of_n_cheap", {"n": N_BON}, metrics_bon,
-        n_lm=1, wall=mdlm_forward_time + (time.time() - t1),
-    ))
+    if not gate_only:
+        t1 = time.time()
+        gen = torch.Generator(device="cpu").manual_seed(seed)
+        probs_at_masks = F.softmax(logits_at_masks.cpu(), dim=-1)  # [n_holes, V]
+        fills = torch.multinomial(
+            probs_at_masks.view(n_holes, -1).repeat(1, 1),
+            N_BON, replacement=True, generator=gen,
+        )  # [n_holes, N_BON]
+        fills = fills.T  # [N_BON, n_holes]
+        log_p = F.log_softmax(logits_at_masks.cpu(), dim=-1)  # [n_holes, V]
+        scores = log_p[
+            torch.arange(n_holes).unsqueeze(0),
+            fills,
+        ].sum(dim=-1)  # [N_BON]
+        best_idx = scores.argmax().item()
+        pred_bon = fills[best_idx].tolist()
+        all_bon = fills.tolist()
+        metrics_bon = _compute_metrics(pred_bon, item, topk_sets, all_samples=all_bon)
+        records.append(_make_record(
+            "best_of_n_cheap", {"n": N_BON}, metrics_bon,
+            n_lm=1, wall=mdlm_forward_time + (time.time() - t1),
+        ))
 
     # ── hard_eq_thrml_oracle ─────────────────────────────────────────────
     t1 = time.time()
@@ -303,7 +305,7 @@ def evaluate_item(
     ))
 
     # ── hard_eq_thrml_global ─────────────────────────────────────────────
-    if n_holes > 1:
+    if n_holes > 1 and not gate_only:
         t1 = time.time()
         samp_global = thrml_joint.build(
             unary=unary_jnp,
@@ -421,6 +423,10 @@ def main() -> int:
                    help="Evaluate on dev split only (20%% by item_id hash)")
     p.add_argument("--test-only", action="store_true",
                    help="Evaluate on test split only (80%% by item_id hash)")
+    p.add_argument("--gate-only", action="store_true",
+                   help="Run only the 3 gate-relevant methods: mdlm_argmax, "
+                        "hard_eq_thrml_oracle, learned_psi_thrml. "
+                        "Skips mask_predict_T0, best_of_n_cheap, hard_eq_thrml_global.")
     p.add_argument("--max-items", type=int, default=None,
                    help="Cap items per corpus×track (for smoke testing)")
     p.add_argument("--out", default="results/m5c_rmc_eval.json")
@@ -484,6 +490,7 @@ def main() -> int:
                     burn_ins=args.burn_in,
                     k=args.k,
                     seed=args.seed,
+                    gate_only=args.gate_only,
                 )
                 all_records.extend(asdict(r) for r in recs)
 

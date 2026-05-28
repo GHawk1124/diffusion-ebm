@@ -58,6 +58,7 @@ MAX_ITEMS="${MAX_ITEMS:-}"
 # Tune these to trade speed vs coverage.  Defaults = full sweep.
 WEIGHT_SCALES="${WEIGHT_SCALES:-0.5 1.0 2.0 5.0}"
 BURN_IN="${BURN_IN:-100 500}"
+GATE_ONLY="${GATE_ONLY:-0}"
 
 module load cuda/12.6.1 python/3.12.5
 export PATH="$HOME/.local/bin:$PATH"
@@ -65,6 +66,12 @@ export HF_HOME="${HF_HOME:-$OUT_DIR/.hf_cache}"
 export PYTHONUNBUFFERED=1
 
 cd "$REPO"
+
+if [[ "$GATE_ONLY" == "1" ]]; then
+    GATE_ONLY_ARG="--gate-only"
+else
+    GATE_ONLY_ARG=""
+fi
 
 if [[ "$DEV_ONLY" == "1" ]]; then
     RUN_TAG="dev"
@@ -105,6 +112,7 @@ uv run python experiments/m5c_eval_rmc.py \
     --k 256 \
     $SPLIT_ARG \
     $MAX_ITEMS_ARG \
+    $GATE_ONLY_ARG \
     --out "$OUT_FILE"
 echo "==> eval done in $((SECONDS / 60)) min"
 
