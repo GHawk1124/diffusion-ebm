@@ -16,7 +16,7 @@
 set -euo pipefail
 
 SBATCH_SCRIPT="slurm/m5c_eval_rmc.sbatch"
-PARTITION="gpu-a100"
+PARTITION="gpu-a100,gpu-l40s,gpu-h200,gpu-h100"
 WALLTIME="2:00:00"
 MAX_ITEMS="200"
 WEIGHT_SCALES="0.5 1.0 2.0"
