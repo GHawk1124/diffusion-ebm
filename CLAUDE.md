@@ -129,7 +129,18 @@ diffusion-ebm/
     m5c_eval.py                # M5c: full template sweep with --temp-override
     m5c_eval_winogrande.py     # M5d Stage 1 (WG, out-of-scope; appendix)
     build_rmc.py               # M5d Stage 1': deterministic RMC extractor
-    m5c_eval_rmc.py            # M5d Stage 1': RMC eval script (to create)
+    m5c_eval_rmc.py            # M5d Stage 1': RMC eval (built; 11 methods —
+                               #   core + Track-0 audit baselines: hard_eq_map,
+                               #   mcmc_logits, best_of_n_strong,
+                               #   predicted_group_hard_eq (+grouping ARI/F1/
+                               #   over-merge); --corpus/--track/--subsample-seed/
+                               #   --group-threshold shard flags; writes JSON
+                               #   ONLY at end — wall-kill loses everything)
+    analyze_rmc.py             # Track-0/A offline analysis: item-level bootstrap
+                               #   CIs + paired Δ-vs-baseline on chain_em_supported
+                               #   + de-oracle grouping + n_lm cost over sharded
+                               #   JSONs; pure stdlib (runs on system python, no
+                               #   CUDA/LD dance); reproduces dev findings exactly
 
   src/diffusion_ebm/tasks/
     winogrande.py              # WG dataclass + build_items (appendix material)
@@ -141,14 +152,19 @@ diffusion-ebm/
     m5c_eval_override.sbatch   # A3 temp-override eval (historical)
     m5c_eval_k256.sbatch       # k=256 eval on existing checkpoint
     m5c_eval_winogrande.sbatch # Stage 1 WG eval (appendix; do not delete)
-    m5c_eval_rmc.sbatch        # Stage 1' RMC eval (to create)
+    m5c_eval_rmc.sbatch        # Stage 1' RMC eval (built; 3-state SPLIT,
+                               #   CORPUS/TRACK/SUBSAMPLE_SEED/GROUP_THRESHOLD
+                               #   shard env vars)
+    submit_rmc_dev.sh          # Stage 1' dev-gate launcher: 4 sharded jobs,
+                               #   typed gres (gpu:<type>:1, never v100),
+                               #   --cpus-per-task=4 (l40s 4:1 cap)
 
   plots/                       # gitignored
   results/                     # gitignored; PACE scratch at
                                #   /storage/scratch1/1/gcomes3/diffusion-ebm/
 ```
 
-## Status (2026-05-27, M5c complete at k=256; M5d in progress toward EMNLP Findings)
+## Status (2026-05-28, M5c complete at k=256; M5d RMC dev gate PASSED but reframed — joint decoding wins, learned ψ ≈ hard equality. PIVOT decided: two-track plan (safe systems result + frustrated-posterior hiring artifact), method UNLOCKED — see M5d block + plan file)
 
 - [x] **M0** — project skeleton, env install, smoke test (PASS).
 - [x] **M1** — Potts chain MVP0 (PASS: independent 0/500 fully aligned;
@@ -244,34 +260,105 @@ diffusion-ebm/
       with no joint Gibbs — it never exercises the method's core inference
       claim. Reframed as out-of-scope appendix material.
 
-      **Stage 1' (Repeated Mention Cloze, RMC) — IN PROGRESS.**
-      10-day time-box, Day-7 dev gate. Real-corpus benchmark where same
-      single-token entity appears ≥ 2 times in a 64-token window; all
-      occurrences masked; method must recover jointly.
-      Two tracks: `single_chain` (one entity; hard-eq is upper bound) and
-      `multi_chain` (2–4 entities; global hard-eq insufficient, ψ must work).
-      Corpora: OWT held-out (last 1000 docs by HF ordering) + WikiText-103
-      validation. Frozen .jsonl artefacts in `data/rmc/`.
+      **Stage 1' (Repeated Mention Cloze, RMC) — DEV GATE PASSED 2026-05-28,
+      BUT REFRAMED.** 10-day time-box, Day-7 dev gate. Real-corpus benchmark
+      where same single-token entity appears ≥ 2 times in a 64-token window;
+      all occurrences masked; method must recover jointly. Two tracks:
+      `single_chain` (one entity; hard-eq is upper bound) and `multi_chain`
+      (2–4 entities). Corpora: OWT held-out (last 1000 docs by HF ordering) +
+      WikiText-103 validation. Frozen .jsonl artefacts in `data/rmc/`.
       Day-7 gate: learned_psi_thrml `chain_em_supported` ≥ mdlm_argmax +5 pp
       on `multi_chain` for ≥1 corpus AND ties hard_eq_oracle within 3 pp
-      on `single_chain`. If gate fails → Stage 1'' (Option E: retrain ψ).
+      on `single_chain`. **Both conditions met — gate PASSES.**
 
-      **Stage 1'' (ψ retrain with broader positives) — reserve fallback.**
-      Entry condition: Stage 1' Day-7 gate fails. Expand tier-1 mining to
-      include pronoun-antecedent pairs via capitalisation heuristics. 3-week
-      time-box; risks ARR Aug 2026, retargets ARR Dec 2026 / ACL 2027.
+      **CRITICAL FINDING (2026-05-28 dev re-run, sharded, ws∈{0.5,1.0,2.0},
+      burn=500, 200 items/cell, paired bootstrap on the method-independent
+      `all_supported` set):** the gate passed on the *joint-decoding* claim,
+      NOT the *learned-scorer* claim. The learned ψ is statistically
+      interchangeable with parameter-free hard equality everywhere, and a new
+      diagnostic method (`learned_psi_thrml_global`, ψ over ALL hole pairs
+      with no oracle grouping) is *negative*. Three robust conclusions:
 
-      **Stage 2:** Two new baselines — `best_of_n` (N=64 ancestral fills
-      ranked by LM log-prob) and `mcmc_logits` (Gibbs with no learned
-      factor, isolating whether the win is joint sampling or learned ψ).
+      1. **Joint factor-graph decoding beats independent argmax** by ~9–14 pp
+         (`chain_em_supported`), CIs exclude 0 on every cell:
+         | cell (supported n) | argmax | hard_eq_oracle | ψ best (ws=0.5) | ψ−argmax | ψ−hard_eq |
+         |---|---|---|---|---|---|
+         | OWT multi (116) | 0.181 | **0.319** | 0.284 | +0.103 SIG | −0.034 n.s. |
+         | OWT single (170) | 0.424 | 0.524 | 0.524 | +0.100 SIG (hard_eq) | +0.000 n.s. |
+         | WT single (151) | 0.298 | 0.384 | 0.404 | +0.086 SIG (hard_eq) | +0.020 n.s. |
+         | WT multi (93) | 0.108 | **0.183** | 0.172 (ws=1.0) | +0.065 SIG | −0.011 n.s. |
+         (WT multi confirmed 2026-05-29 via analyze_rmc.py — all 4 cells agree.)
 
-      **Stage 3:** Three seeds + bootstrap CIs on RMC headline metrics.
-      Item-level bootstrap (NOT chain-level — chains are autocorrelated).
+      2. **Learned ψ ≈ hard equality (`==`).** ψ ties hard_eq_oracle within
+         noise on all measured cells (Δ ∈ [−0.034, +0.020], all n.s.); at
+         ws≥1.0 ψ is *worse*. The learned factor is interchangeable with
+         hard equality on RMC — no learned-scorer advantage.
 
-      **Stage 4:** Wall-clock cost measurement for the Pareto figure.
+      3. **`learned_psi_thrml_global` is negative.** Without oracle grouping
+         the learned factor does NOT recover identity structure: it ties
+         naive `hard_eq_global` (OWT: ψ_global 0.078 vs 0.060, Δ=+0.017 n.s.)
+         and both sit near the floor vs oracle's 0.319. At ws≥1.0 ψ_global
+         collapses to 0.009 (over-merges distinct entity chains). The one
+         test that could have justified the learned scorer fails.
 
-      **Do not touch:** PairwiseScorer architecture, MDLM backbone, THRML
-      wiring, training objective. Method is locked.
+      **Reframed honest claim:** "Joint factor-graph decoding (THRML
+      block-Gibbs) over MDLM candidates with known entity grouping improves
+      multi-mask identity consistency by ~9–14 pp over independent sampling
+      at matched neural FLOPs; a learned pairwise scorer is interchangeable
+      with hard equality on this benchmark." The learned-ψ headline from the
+      template experiments (M5c) does NOT survive contact with real-corpus
+      RMC. See [[m5d-rmc-dev-findings]] decision point in the plan.
+
+      **wt_multi RESOLVED (2026-05-29):** all 4 dev shards are local in
+      `results/m5c_rmc_dev_*_smoke200.json` and folded into the 4-cell table
+      above via `experiments/analyze_rmc.py`. wt_multi confirms the other
+      three: hard_eq−argmax +0.075 SIG, ψ−argmax +0.065 SIG, ψ−hard_eq
+      −0.011 n.s. The old-dev shards predate the Track-0 baselines, so the
+      Track-0 dev sweep (`bash slurm/submit_rmc_dev.sh`, no --gate-only) must
+      be (re)run to populate hard_eq_map / mcmc_logits / best_of_n_strong /
+      predicted_group_hard_eq before Track-A test-split execution.
+
+      **PIVOT (2026-05-28): two-track plan, method UNLOCKED.** After the
+      codex gpt-5.5-xhigh second opinion + critique, the dead learned-ψ
+      thesis is replaced by a two-track plan (active plan:
+      `/home/ghawk/.claude/plans/shiny-watching-sundae.md`). The key
+      realisation: hard-eq + *oracle grouping* has a closed-form
+      product-of-experts MAP (`argmax_t Σ_i log p_i(t)`) — no sampling
+      needed — so the current RMC benchmark is exactly the case where
+      sampling hardware buys nothing. Bad for the Extropic goal.
+
+      - **Track 0 (do first, ~1 wk, gates everything):** additive audit
+        baselines on the *dev* split — `hard_eq_map` (exact pooling, will
+        tie THRML and prove sampling earns nothing here), `mcmc_logits`
+        (no-factor Gibbs control, promoted to REQUIRED), `best_of_n_strong`
+        (real joint-LM-scored best-of-N, not the ≈argmax `best_of_n_cheap`),
+        and `predicted_group_hard_eq` (de-oracle probe). Decision rule in
+        the plan.
+      - **Track A (weeks 2–4, safety net, NOT where effort goes):** ship
+        framing (a) — "cheap joint decoding helps ~9–14 pp at matched FLOPs;
+        hard equality suffices, learned factor adds nothing; no-free-lunch
+        boundary." Do NOT run the test-split sweep until Track 0 adds the
+        honest baselines.
+      - **Track B (weeks 2–7, the hiring artifact, marginal effort goes
+        here):** latent-partition RMC as **correlation clustering** —
+        attraction (equality) + a NEW antiferromagnetic **repulsion /
+        inequality factor** = a *frustrated* Potts posterior. Removes the
+        oracle crutch, is multimodal, exact MAP is NP-hard, and is the
+        canonical thermodynamic-hardware (frustrated Ising/Potts) workload.
+        Report grouping ARI/F1 + over-merge rate, mixing diagnostics,
+        hardware-native graph properties, FLOPs↔wall-clock Pareto.
+
+      **Method status: UNLOCKED for Track B.** `factors/learned.py`,
+      `sampler/thrml_joint*.py`, factor design, temperature/schedule are now
+      in scope. New files expected: `factors/inequality.py`,
+      `sampler/thrml_latent_partition.py`. Still frozen for comparability:
+      the RMC benchmark itself (`tasks/rmc.py`, `build_rmc.py`,
+      `data/rmc/*.jsonl`) — Track B adds a latent-partition *view*, never
+      mutates the frozen artefacts.
+
+      Three seeds + item-level bootstrap CIs and wall-clock cost measurement
+      remain as the weeks 10–11 buffer for whichever track becomes the
+      headline.
 
 ## Environment quirks (NixOS-specific, **important**)
 
@@ -349,6 +436,29 @@ attention call dies with `FileNotFoundError: '/sbin/ldconfig'`.
   the strict argmax) but it can still rank above negative logits, so set
   it to `-inf` before any sampling/top-k.  `MDLM.top_k_candidates` does
   this by default.
+
+## PACE submission quirks (learned 2026-05-28, **important**)
+
+- **GPU type selection: use a typed gres, NOT a `--partition` list.** PACE
+  does site-side partition routing — a multi-partition `--partition` list
+  gets expanded and silently re-adds `gpu-v100`, so jobs land on V100s
+  despite v100 not being in the list. A typed gres (`--gres=gpu:a100:1`,
+  `gpu:h200:1`, `gpu:l40s:1`, `gpu:h100:1`) can only be satisfied by a node
+  that actually has that GPU, so it cannot land on v100 regardless of
+  routing. Partitions are GPU-type-pure (`gpu-a100` holds only a100, etc.).
+- **`gpu-l40s` enforces a 4:1 CPU:GPU ratio.** The base eval sbatch requests
+  `--cpus-per-task=8` with 1 GPU (8:1) → rejected with "Invalid gres". Pass
+  `--cpus-per-task=4` (4 cores is plenty for this eval; satisfies the cap on
+  all partitions). `submit_rmc_dev.sh` already does this.
+- **Find free GPUs before submitting:**
+  `sinfo -p gpu-a100,gpu-l40s,gpu-h200,gpu-h100 -t idle,mix -o "%P %t %D %G"`
+  (`mix`=partially free, `drng`/`drain`=draining, avoid).
+- **`m5c_eval_rmc.py` writes its JSON only as the final step.** A wall-kill
+  (`#SBATCH --time` exceeded) loses ALL in-memory records — no incremental
+  checkpoint. Always shard so each job finishes well under the wall, and
+  size `--time` generously (single_chain ~40 min, multi_chain heavier).
+- **Pull dev shards down (run on the local NixOS host, not PACE):**
+  `scp 'gcomes3@login-phoenix.pace.gatech.edu:/storage/scratch1/1/gcomes3/diffusion-ebm/results/m5c_rmc_dev_*_smoke200.json' results/`
 
 ## How to run things
 
@@ -438,14 +548,64 @@ canonical reference if a future API change confuses things.
   set by the tabular NCE + repeat-token mining objective.  WinoGrande
   (pronoun resolution) is out of scope.  Expanding to reference consistency
   would require a retrain (Stage 1'' / Option E).
+- **Does the learned ψ beat hard equality on real text?** — resolved
+  2026-05-28 (RMC dev, paired bootstrap): NO. ψ ties `==` within noise on
+  every measured cell and is worse at ws≥1.0. The M5c template "wins" were
+  artefacts of hand-built templates; on RMC the identity signal ψ encodes
+  is already captured by hard equality. The *joint decoding* (any coupling
+  factor vs independent argmax) is the real, significant effect (+9–14 pp).
+- **Can ψ recover entity grouping without oracle labels?** — resolved
+  2026-05-28: NO. `learned_psi_thrml_global` (all-pairs, no grouping) ties
+  naive global hard-equality at the floor and collapses at ws≥1.0.
 
 ## Open questions / M5d decisions pending
 
-- **RMC Day-7 dev gate** — does ψ+THRML exceed MDLM argmax on
-  `multi_chain chain_em_supported` by ≥ 5 pp on at least one corpus,
-  AND tie `hard_eq_thrml_oracle` within 3 pp on `single_chain`?
-  (WinoGrande generalisation question closed — reframed as scope mismatch;
-  see Stage 1 failure note above.)
+- **RMC Day-7 dev gate** — RESOLVED 2026-05-28: gate PASSES (OWT multi
+  ψ−argmax +10.3 pp SIG; both single-chain cells tie hard_eq within 3 pp).
+  But it passed on the *joint-decoding* claim, not the *learned-scorer*
+  claim — ψ is interchangeable with hard equality, and `ψ_global` is
+  negative. See Stage 1' block above and the plan's decision point.
+- **THE framing decision** — RESOLVED 2026-05-28: "both — safe + ambitious"
+  + method UNLOCKED. Track A ships framing (a) as the safety net; Track B
+  (frustrated-posterior latent-partition RMC) is the groundbreaking +
+  Extropic-aligned hiring artifact. Framing (c) (coreference retrain) is
+  dropped — Track B targets latent partition (a frustrated Potts inference
+  `==` cannot express) instead. See M5d block + plan file.
+- **Track 0 open questions — ALL RESOLVED 2026-05-29** (dev sweep, 4 shards,
+  200 items/cell, ws∈{0.5,1.0,2.0}, burn=500, paired bootstrap B=10000 on the
+  method-independent supported set; full report
+  `results/rmc_dev_track0_analysis.md` via `experiments/analyze_rmc.py`):
+  - `hard_eq_map` (exact pooling MAP) vs THRML hard-eq → **MATCHES OR BEATS,
+    never loses.** Δ(map−oracle): owt_multi +0.026 n.s., owt_single +0.024
+    SIG, wt_multi +0.032 n.s., wt_single +0.040 n.s. The closed-form argmax
+    (n_lm=1, ~0.07s, agree=1.000 by construction) *strictly dominates* the
+    sampler (~2.5s) — stronger than the predicted tie. **Sampling earns
+    nothing on the oracle-grouped equality task → Track B frustration is
+    REQUIRED and well-motivated. GREEN LIGHT for Track B.**
+  - `mcmc_logits` (no-factor Gibbs) ≈ argmax → **CONFIRMED.** Δ(mcmc−argmax)
+    ∈ [−0.011, +0.006], all n.s. on every cell. The +7–14 pp joint win comes
+    from the *factor*, not from Gibbs (honest-framing insight, empirically).
+  - `best_of_n_strong` (joint-LM-scored N=64, 65× FLOPs) → **does NOT threaten
+    the headline; it LOSES badly.** Δ(oracle−BoN): owt_multi +0.224, owt_single
+    +0.282, wt_multi +0.118, wt_single +0.225, all SIG. BoN_strong even
+    underperforms plain argmax (re-ranks fluent-but-wrong ancestral fills).
+    Matched-FLOPs headline is SAFE and strengthened.
+  - `predicted_group_hard_eq` (de-oracle) → **SPLIT by track.** single_chain:
+    recovers a meaningful, SIG fraction of oracle gain (owt 24%, wt 54%;
+    over-merge 0.000) → honest NLP result on single. multi_chain: recovers
+    ~0% / hurts (owt 0%, wt −29%; over-merge 0.11–0.13, ARI ~0.50) → Jaccard
+    over-merges distinct entities — the SAME failure as ψ_global, and exactly
+    the gap Track B's repulsion/inequality factor is designed to close.
+  - **Track A headline gate (verification table) PASSES on dev:** (best joint
+    − argmax) SIG on both multi cells; (joint − best_of_n_strong) SIG on all
+    4; (ψ − hard_eq_oracle) CI includes 0 on all 4. Still must re-confirm on
+    the test split before the paper's headline table.
+- **Track B open questions:**
+  - Can the attraction+repulsion (frustrated) graph stop the `ψ_global`
+    over-merge collapse and recover entity partition (grouping ARI) without
+    oracle labels?
+  - Is there a Pareto regime where block-Gibbs strictly dominates argmax,
+    exact pooling, and best-of-N — the hardware-justifying figure?
 - **Variable template framing** — `' x'` is outside MDLM's top-256 in
   prose context. Current "1.000 agreement" is on `' variable'`/`' that'`.
   Must be framed as a top-k ceiling example in the paper, not a success.
@@ -456,7 +616,8 @@ canonical reference if a future API change confuses things.
   drop from primary eval.
 - **k=256 retrain calibration** — does room-polyseme stabilise across all
   weight-scales when trained natively at k=256 (vs current 0.656 only at
-  ws=0.5)? Answered by the pending `m5c_train_k256.sbatch` run.
+  ws=0.5)? Answered by the pending `m5c_train_k256.sbatch` run. (Now low
+  priority — template results are superseded by RMC.)
 
 ## File-locating tips
 
