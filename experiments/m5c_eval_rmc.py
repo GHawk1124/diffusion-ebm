@@ -16,13 +16,29 @@ Methods:
   mdlm_argmax          — single MDLM forward, argmax at each mask.
   mask_predict_T0      — Mask-Predict @ T=0, n_iters=4.
   best_of_n_cheap      — N=64 ancestral fills from 1 MDLM forward, ranked
-                          by sum log-marginal.
+                          by sum log-marginal (≈ argmax; 1 forward).
   hard_eq_thrml_oracle — THRML hard equality per identity chain (oracle labels).
   hard_eq_thrml_global — THRML hard equality over all mask positions (naïve).
   learned_psi_thrml    — locked ψ+THRML, oracle chain grouping, ws × burn sweep.
   learned_psi_thrml_global — locked ψ+THRML over ALL hole pairs, NO oracle
                           grouping (multi_chain only); tests whether the
                           learned factor recovers identity structure unaided.
+
+Track-0 audit baselines (additive; show whether sampling earns its keep):
+  hard_eq_map          — exact closed-form product-of-experts pooling MAP over
+                          oracle groups (argmax_t Σ_{i∈g} log p_i(t)); no
+                          sampling. Expected to tie hard_eq_thrml_oracle.
+  mcmc_logits          — block-Gibbs with NO coupling factor (unary only);
+                          isolates the factor as the source of any joint win.
+                          Expected ≈ mdlm_argmax.
+  best_of_n_strong     — N=64 ancestral fills scored by a real batched MDLM
+                          joint forward (sum log p at former-mask positions),
+                          ranked, best kept. ~1+N neural forwards (~65× FLOPs);
+                          the matched-FLOPs headline must beat this.
+  predicted_group_hard_eq — cluster holes WITHOUT gold (top-k Jaccard union-
+                          find), then hard-eq within predicted groups. The
+                          de-oracle probe; reports grouping ARI / pairwise F1 /
+                          over-merge rate / n_pred_groups.
 
 Run (dev split, Day-7 gate):
     uv run python experiments/m5c_eval_rmc.py \\
@@ -96,6 +112,13 @@ class Record:
     n_lm_forwards: int
     wall_time_s: float
     seed: int
+
+    # Grouping metrics — only populated for predicted_group_hard_eq; the
+    # predicted partition (no gold) is scored against gold chain_labels.
+    grouping_ari: Optional[float] = None
+    grouping_pairwise_f1: Optional[float] = None
+    over_merge_rate: Optional[float] = None       # cross-chain pairs merged
+    n_pred_groups: Optional[int] = None
 
 
 # ── Loader ───────────────────────────────────────────────────────────────────
@@ -183,6 +206,111 @@ def _all_pairs_within(groups: list[list[int]]) -> list[tuple[int, int]]:
     return pairs
 
 
+def _predict_groups_jaccard(
+    topk_sets: list[set[int]], threshold: float
+) -> list[list[int]]:
+    """Cluster holes WITHOUT gold via top-k Jaccard overlap + union-find.
+
+    Two holes whose top-k candidate sets overlap with Jaccard ≥ threshold are
+    merged. Connected components are the predicted entity groups. This is the
+    de-oracle grouping signal: it only sees the corrupted input's MDLM top-k.
+    """
+    n = len(topk_sets)
+    parent = list(range(n))
+
+    def find(x: int) -> int:
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    def union(a: int, b: int) -> None:
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[rb] = ra
+
+    for a in range(n):
+        for b in range(a + 1, n):
+            inter = len(topk_sets[a] & topk_sets[b])
+            union_sz = len(topk_sets[a] | topk_sets[b])
+            jac = inter / union_sz if union_sz else 0.0
+            if jac >= threshold:
+                union(a, b)
+
+    comps: dict[int, list[int]] = defaultdict(list)
+    for i in range(n):
+        comps[find(i)].append(i)
+    return list(comps.values())
+
+
+def _adjusted_rand_index(labels_a: list[int], labels_b: list[int]) -> float:
+    """ARI between two flat label assignments (1.0 = identical partition)."""
+    n = len(labels_a)
+    if n < 2:
+        return 1.0
+    contingency: dict[tuple[int, int], int] = Counter(zip(labels_a, labels_b))
+    a_counts: Counter = Counter(labels_a)
+    b_counts: Counter = Counter(labels_b)
+
+    def comb2(x: int) -> int:
+        return x * (x - 1) // 2
+
+    sum_comb = sum(comb2(v) for v in contingency.values())
+    sum_a = sum(comb2(v) for v in a_counts.values())
+    sum_b = sum(comb2(v) for v in b_counts.values())
+    total = comb2(n)
+    expected = (sum_a * sum_b) / total if total else 0.0
+    max_index = 0.5 * (sum_a + sum_b)
+    denom = max_index - expected
+    if denom == 0:
+        # Both partitions are trivial (e.g. all-singletons or all-one-cluster).
+        return 1.0
+    return (sum_comb - expected) / denom
+
+
+def _grouping_metrics(
+    pred_groups: list[list[int]], gold_labels: list[int]
+) -> dict:
+    """Compare predicted partition to gold chain labels.
+
+    Returns adjusted Rand index, pairwise-link F1, over-merge rate (fraction of
+    cross-chain hole pairs the prediction merged), and the predicted group count.
+    """
+    n = len(gold_labels)
+    pred_labels = [0] * n
+    for gi, g in enumerate(pred_groups):
+        for i in g:
+            pred_labels[i] = gi
+
+    tp = fp = fn = 0
+    cross_total = cross_merged = 0
+    for a in range(n):
+        for b in range(a + 1, n):
+            gold_same = gold_labels[a] == gold_labels[b]
+            pred_same = pred_labels[a] == pred_labels[b]
+            if gold_same and pred_same:
+                tp += 1
+            elif gold_same and not pred_same:
+                fn += 1
+            elif (not gold_same) and pred_same:
+                fp += 1
+            if not gold_same:
+                cross_total += 1
+                if pred_same:
+                    cross_merged += 1
+
+    prec = tp / (tp + fp) if (tp + fp) else 1.0
+    rec = tp / (tp + fn) if (tp + fn) else 1.0
+    f1 = 2 * prec * rec / (prec + rec) if (prec + rec) else 0.0
+    over_merge = cross_merged / cross_total if cross_total else 0.0
+    return {
+        "grouping_ari": _adjusted_rand_index(gold_labels, pred_labels),
+        "grouping_pairwise_f1": f1,
+        "over_merge_rate": over_merge,
+        "n_pred_groups": len(pred_groups),
+    }
+
+
 # ── Per-item evaluation ──────────────────────────────────────────────────────
 
 def evaluate_item(
@@ -194,6 +322,7 @@ def evaluate_item(
     k: int,
     seed: int,
     gate_only: bool = False,
+    group_threshold: float = 0.3,
 ) -> list[Record]:
     """Run all methods on one RMC item. Returns list of Records."""
     device = mdlm.device
@@ -231,7 +360,7 @@ def evaluate_item(
     rng_key = jax.random.PRNGKey(seed)
     records: list[Record] = []
 
-    def _make_record(method, config, metrics, n_lm, wall):
+    def _make_record(method, config, metrics, n_lm, wall, **extra):
         return Record(
             item_id=item.item_id,
             corpus=item.corpus,
@@ -242,6 +371,7 @@ def evaluate_item(
             wall_time_s=wall,
             seed=seed,
             **metrics,
+            **extra,
         )
 
     # ── mdlm_argmax ──────────────────────────────────────────────────────
@@ -395,6 +525,107 @@ def evaluate_item(
                     wall=mdlm_forward_time + (time.time() - t1),
                 ))
 
+    # ══ Track-0 audit baselines ══════════════════════════════════════════
+    if not gate_only:
+        # ── hard_eq_map: exact closed-form pooling MAP over oracle groups ─
+        # argmax_t Σ_{i∈g} log p_i(t) over the full vocab — the closed-form
+        # product-of-experts MAP that hard equality + oracle grouping admits.
+        # No sampling. If this ties hard_eq_thrml_oracle, sampling earns
+        # nothing on the equality task (the Track-B-frustration green light).
+        t1 = time.time()
+        logp_full = F.log_softmax(logits_at_masks, dim=-1)  # [n_holes, V]
+        pred_map = [0] * n_holes
+        for g in oracle_groups:
+            idx = torch.tensor(g, device=logp_full.device)
+            pooled = logp_full.index_select(0, idx).sum(dim=0)  # [V]
+            t_star = int(pooled.argmax().item())
+            for i in g:
+                pred_map[i] = t_star
+        metrics_map = _compute_metrics(pred_map, item, topk_sets)
+        records.append(_make_record(
+            "hard_eq_map", {"support": "full_vocab"}, metrics_map,
+            n_lm=1, wall=mdlm_forward_time + (time.time() - t1),
+        ))
+
+        # ── mcmc_logits: block-Gibbs with NO coupling factor (unary only) ─
+        t1 = time.time()
+        samp_nofac = thrml_joint.build(
+            unary=unary_jnp,
+            candidate_ids=cand_jnp,
+            equality_groups=[],
+            equality_weight=5.0,
+            k=k,
+        )
+        samples_nofac_jnp = thrml_joint.sample(
+            samp_nofac, rng_key, n_chains=N_CHAINS, burn_in=200,
+        )
+        samples_nofac = np.asarray(samples_nofac_jnp).tolist()
+        pred_nofac = _majority_vote(samples_nofac)
+        metrics_nofac = _compute_metrics(pred_nofac, item, topk_sets,
+                                          all_samples=samples_nofac)
+        records.append(_make_record(
+            "mcmc_logits",
+            {"factor": "none", "burn_in": 200, "n_chains": N_CHAINS, "k": k},
+            metrics_nofac, n_lm=1, wall=mdlm_forward_time + (time.time() - t1),
+        ))
+
+        # ── best_of_n_strong: N ancestral fills, real joint-LM rerank ─────
+        # Sample N fills per-hole, place them, run ONE batched MDLM forward
+        # over the N filled sequences, score each by Σ log p(token | filled
+        # context) at the former-mask positions, keep the best. ~1+N forwards.
+        t1 = time.time()
+        gen = torch.Generator(device="cpu").manual_seed(seed + 1)
+        probs_at_masks = F.softmax(logits_at_masks.cpu(), dim=-1)  # [n_holes, V]
+        fills = torch.multinomial(
+            probs_at_masks, N_BON, replacement=True, generator=gen,
+        ).T.contiguous()  # [N_BON, n_holes]
+        mask_pos_t = torch.tensor(mask_pos, device=device)
+        filled = item.masked_input_ids.unsqueeze(0).repeat(N_BON, 1).to(device)
+        filled[:, mask_pos_t] = fills.to(device)
+        strong_logits = mdlm.forward(filled)  # [N_BON, L, V]
+        masked_logits = strong_logits[:, mask_pos_t, :].float()  # [N, n_holes, V]
+        masked_logits[..., MASK_TOKEN_ID] = -float("inf")
+        strong_logp = F.log_softmax(masked_logits, dim=-1)  # [N, n_holes, V]
+        seq_scores = strong_logp.gather(
+            -1, fills.to(device).unsqueeze(-1)
+        ).squeeze(-1).sum(dim=-1)  # [N_BON]
+        best_j = int(seq_scores.argmax().item())
+        pred_bon_s = fills[best_j].tolist()
+        all_bon_s = fills.tolist()
+        metrics_bon_s = _compute_metrics(pred_bon_s, item, topk_sets,
+                                          all_samples=all_bon_s)
+        records.append(_make_record(
+            "best_of_n_strong", {"n": N_BON, "scoring": "joint_lm"},
+            metrics_bon_s, n_lm=1 + N_BON,
+            wall=mdlm_forward_time + (time.time() - t1),
+        ))
+
+        # ── predicted_group_hard_eq: de-oracle grouping + hard equality ───
+        t1 = time.time()
+        pred_groups = _predict_groups_jaccard(topk_sets, group_threshold)
+        samp_pg = thrml_joint.build(
+            unary=unary_jnp,
+            candidate_ids=cand_jnp,
+            equality_groups=pred_groups,
+            equality_weight=5.0,
+            k=k,
+        )
+        samples_pg_jnp = thrml_joint.sample(
+            samp_pg, rng_key, n_chains=N_CHAINS, burn_in=200,
+        )
+        samples_pg = np.asarray(samples_pg_jnp).tolist()
+        pred_pg = _majority_vote(samples_pg)
+        metrics_pg = _compute_metrics(pred_pg, item, topk_sets,
+                                       all_samples=samples_pg)
+        grouping = _grouping_metrics(pred_groups, item.chain_labels)
+        records.append(_make_record(
+            "predicted_group_hard_eq",
+            {"equality_weight": 5.0, "burn_in": 200, "n_chains": N_CHAINS,
+             "k": k, "group_threshold": group_threshold},
+            metrics_pg, n_lm=1, wall=mdlm_forward_time + (time.time() - t1),
+            **grouping,
+        ))
+
     return records
 
 
@@ -437,6 +668,17 @@ def _print_summary(records: list[dict], n_items: int) -> None:
         if burn != "":
             cfg_str += f" burn={burn}"
 
+        grp_str = ""
+        ari_vals = [r["grouping_ari"] for r in recs if r.get("grouping_ari") is not None]
+        if ari_vals:
+            f1_vals = [r["grouping_pairwise_f1"] for r in recs]
+            om_vals = [r["over_merge_rate"] for r in recs]
+            grp_str = (
+                f"  ari={sum(ari_vals)/len(ari_vals):.3f}"
+                f"  link_f1={sum(f1_vals)/len(f1_vals):.3f}"
+                f"  over_merge={sum(om_vals)/len(om_vals):.3f}"
+            )
+
         print(
             f"  {method:<28s}{cfg_str:<14s}"
             f"  items={n:>4d}  sup={n_sup:>4d}"
@@ -445,6 +687,7 @@ def _print_summary(records: list[dict], n_items: int) -> None:
             f"  tok_acc={tok_acc:.3f}"
             f"  agree={agree:.3f}"
             f"  topk={topk:.3f}"
+            f"{grp_str}"
         )
 
 
@@ -466,8 +709,12 @@ def main() -> int:
                    help="Evaluate on test split only (80%% by item_id hash)")
     p.add_argument("--gate-only", action="store_true",
                    help="Run only the 3 gate-relevant methods: mdlm_argmax, "
-                        "hard_eq_thrml_oracle, learned_psi_thrml. "
-                        "Skips mask_predict_T0, best_of_n_cheap, hard_eq_thrml_global.")
+                        "hard_eq_thrml_oracle, learned_psi_thrml. Skips "
+                        "mask_predict_T0, best_of_n_cheap, hard_eq_thrml_global, "
+                        "and all Track-0 audit baselines.")
+    p.add_argument("--group-threshold", type=float, default=0.3,
+                   help="Top-k Jaccard threshold for predicted_group_hard_eq "
+                        "de-oracle clustering (default: 0.3)")
     p.add_argument("--corpus", default="both",
                    choices=["both", "owt_heldout", "wikitext103"],
                    help="Restrict to one corpus (for sharded jobs)")
@@ -547,6 +794,7 @@ def main() -> int:
                     k=args.k,
                     seed=args.seed,
                     gate_only=args.gate_only,
+                    group_threshold=args.group_threshold,
                 )
                 all_records.extend(asdict(r) for r in recs)
 

@@ -2,9 +2,10 @@
 # ============================================================================
 # M5c — RMC benchmark evaluation.
 #
-# Runs all 6 methods on all 4 corpus×track files with the k=256 retrain
-# checkpoint.  Supports dev-only mode (Day-7 gate) and full-test mode
-# (Days 8-10).
+# Runs all methods (core + Track-0 audit baselines: hard_eq_map, mcmc_logits,
+# best_of_n_strong, predicted_group_hard_eq) on all 4 corpus×track files with
+# the k=256 retrain checkpoint.  Supports dev-only mode (Day-7 gate / Track-0
+# audit) and full-test mode (Track A).
 #
 # Submit (dev split — Day-7 gate):
 #   sbatch --export=ALL,DEV_ONLY=1 slurm/m5c_eval_rmc.sbatch
@@ -70,6 +71,8 @@ MAX_ITEMS="${MAX_ITEMS:-}"
 WEIGHT_SCALES="${WEIGHT_SCALES:-0.5 1.0 2.0 5.0}"
 BURN_IN="${BURN_IN:-100 500}"
 GATE_ONLY="${GATE_ONLY:-0}"
+# Top-k Jaccard threshold for the predicted_group_hard_eq de-oracle probe.
+GROUP_THRESHOLD="${GROUP_THRESHOLD:-0.3}"
 
 module load cuda/12.6.1 python/3.12.5
 export PATH="$HOME/.local/bin:$PATH"
@@ -130,6 +133,7 @@ uv run python experiments/m5c_eval_rmc.py \
     $CORPUS_ARG \
     $TRACK_ARG \
     --subsample-seed "$SUBSAMPLE_SEED" \
+    --group-threshold "$GROUP_THRESHOLD" \
     $MAX_ITEMS_ARG \
     $GATE_ONLY_ARG \
     --out "$OUT_FILE"
