@@ -158,6 +158,9 @@ diffusion-ebm/
     submit_rmc_dev.sh          # Stage 1' dev-gate launcher: 4 sharded jobs,
                                #   typed gres (gpu:<type>:1, never v100),
                                #   --cpus-per-task=4 (l40s 4:1 cap)
+    submit_rmc_test.sh         # Track-A test-split launcher: 4 shards, SPLIT=test,
+                               #   full method set (no --gate-only), ws∈{0.5,1.0},
+                               #   MAX_ITEMS caps (single 900 / multi 450), 12h wall
 
   plots/                       # gitignored
   results/                     # gitignored; PACE scratch at
