@@ -87,11 +87,14 @@ diffusion-ebm/
       mdlm.py                  # M2: MDLM HF wrapper + forward_hidden
     factors/
       equality.py              # M3: hard equality [k,k] table
+      inequality.py            # Track B: antiferromagnetic repulsion [k,k] table
       learned.py               # M5c: PairwiseScorer bilinear ψ + log_temp
       unary.py
     sampler/
       thrml_joint.py           # M3: hard-equality THRML factor graph
       thrml_joint_learned.py   # M5c: learned-ψ THRML factor graph
+      thrml_latent_partition.py # Track B: frustrated attract+repel token sampler
+                               #   (partition_to_edges / jaccard_partition / build / sample)
       baselines.py             # M5a: ancestral, mask-predict, iterative-topk
     tasks/
       multihole.py             # M3–M5b: 8 template families + all_templates()
@@ -141,6 +144,33 @@ diffusion-ebm/
                                #   + de-oracle grouping + n_lm cost over sharded
                                #   JSONs; pure stdlib (runs on system python, no
                                #   CUDA/LD dance); reproduces dev findings exactly
+    probe_splitability.py      # Track B scout 1: exact partition posterior over
+                               #   real over-merged dev components (YELLOW; 0.44
+                               #   split-recovery ceiling — top-k bound). Builds
+                               #   results/probe_splitability_cache.json (1 MDLM
+                               #   forward/item) reused by scouts 2+3.
+    probe_hardness_dial.py     # Track B scout 2: frustrated Potts w/ real MDLM
+                               #   fields. EXP A Pareto crossover n≈11; EXP B
+                               #   metastability wall at w≥8; EXP B2 burn-in
+                               #   invariant. GREEN. (imports jax/flp)
+    probe_tempering.py         # Track B scout 3: numpy block-Gibbs + annealing +
+                               #   parallel tempering vs the wall. PT restores
+                               #   TV→MC-floor (0.41→0.008) at ~9× cost. Hero fig.
+                               #   EXP C barrier / EXP D sparsity / EXP E THRML↔
+                               #   numpy cross-val (proxy confirmed; target peaked
+                               #   not multimodal; wall = ensemble over-dispersion,
+                               #   single-chain TV is high-variance).
+    probe_partition_hardness.py # Track B scout 4: do REAL full-window RMC graphs
+                               #   land in the hard regime? Exact Bell(n) partition
+                               #   posterior at full L=256 via pooled product-of-
+                               #   experts (per-group factorisation removes the L^n
+                               #   blowup; n≤10 → Bell≤116k, <1s). VERDICT: NO —
+                               #   posteriors are ambiguous (53% multimodal, p_MAP
+                               #   ~0.66 @ β=4) but exact-in-<1s AND single-T Gibbs
+                               #   mixes to MC floor (TV 0.008) even on the most
+                               #   ambiguous items → no barrier; ambiguity≠hardness.
+                               #   Closes the open question: hard regime is synthetic
+                               #   only. (imports probe_splitability helpers; numpy)
 
   src/diffusion_ebm/tasks/
     winogrande.py              # WG dataclass + build_items (appendix material)
@@ -167,7 +197,7 @@ diffusion-ebm/
                                #   /storage/scratch1/1/gcomes3/diffusion-ebm/
 ```
 
-## Status (2026-05-28, M5c complete at k=256; M5d RMC dev gate PASSED but reframed — joint decoding wins, learned ψ ≈ hard equality. PIVOT decided: two-track plan (safe systems result + frustrated-posterior hiring artifact), method UNLOCKED — see M5d block + plan file)
+## Status (2026-05-31, M5d Track A test-split LOCKED — joint factor-graph decoding beats independent argmax by +7–15 pp on the held-out test split (all 4 cells SIG); hard_eq_map (closed-form pooling) DOMINATES the sampler; learned ψ ≤ hard equality (SIG-worse on wt_single). Track A is DONE. Track B SCOUTED via 4 fail-fast probes — RMC is too easy for the sampler (splitability ceiling 0.44; scout-4 full-window partition posterior is ambiguous but exact-in-<1s AND mixes to the MC floor TV=0.008 → no barrier, ambiguity≠hardness, real-hard-task question CLOSED negative), BUT a dialed-hardness frustrated Potts has a genuine regime (n≳12) where exact dies + single-T Gibbs hits a burn-in-invariant metastability wall (w≥8) + parallel tempering crosses it (TV 0.41→0.008 at ~9×). Thesis reshaped: hero fig = Pareto+metastability+tempering, legitimately SYNTHETIC, NOT RMC accuracy. See Track B SCOUT FINDINGS block + plan file)
 
 - [x] **M0** — project skeleton, env install, smoke test (PASS).
 - [x] **M1** — Potts chain MVP0 (PASS: independent 0/500 fully aligned;
@@ -321,6 +351,37 @@ diffusion-ebm/
       be (re)run to populate hard_eq_map / mcmc_logits / best_of_n_strong /
       predicted_group_hard_eq before Track-A test-split execution.
 
+      **TRACK A TEST-SPLIT — LOCKED HEADLINE (2026-05-29).** Full method set
+      (core + Track-0 baselines, NO `--gate-only`) on the held-out 80% test
+      split via `slurm/submit_rmc_test.sh` (4 GPU shards: single→a100,
+      multi→h200) merged offline with `experiments/analyze_rmc.py`.
+      `chain_em_supported`, paired bootstrap B=10000 on the method-independent
+      supported set (per-shard MAX_ITEMS caps → supported n below):
+
+      | cell (n) | argmax | hard_eq_oracle | hard_eq_map | ψ best | joint−argmax |
+      |---|---|---|---|---|---|
+      | owt multi (250)  | 0.104 | 0.224 | **0.252** | 0.212 | +0.120 SIG |
+      | owt single (753) | 0.359 | 0.507 | **0.541** | 0.494 | +0.149 SIG |
+      | wt multi (213)   | 0.042 | 0.108 | **0.127** | 0.085 | +0.066 SIG |
+      | wt single (706)  | 0.303 | 0.432 | **0.466** | 0.409 | +0.129 SIG |
+
+      Test reproduces dev on ~4× the items; every Track-0 audit verdict holds:
+      - `mcmc_logits − argmax` n.s. on all 4 — the win is the *factor*, not Gibbs.
+      - `joint − best_of_n_strong` SIG on all 4 — matched-FLOPs headline SAFE.
+      - `hard_eq_map` (closed-form pooling, n_lm=1) SIG-DOMINATES the oracle
+        *sampler* on both single cells (+0.033, +0.034) and ties/wins on multi.
+        Sampling earns nothing on the oracle-grouped equality task → Track B
+        frustration is REQUIRED. **GREEN LIGHT for Track B.**
+      - `predicted_group_hard_eq` (de-oracle) recovers 30–32% of oracle gain on
+        single_chain (over-merge 0.000) but only 7% / −14% on multi_chain
+        (over-merge ~0.09–0.10) — the exact over-merge failure Track B's
+        repulsion factor is designed to close.
+      - **ψ − hard_eq_oracle:** n.s. on 3 cells but **SIG-WORSE on wt_single**
+        (−0.023 [−0.044, −0.001]). The learned scorer is interchangeable-at-
+        best and slightly *hurts* on one cell. Honest claim tightens from
+        "ψ ≈ hard_eq" to **"ψ ≤ hard_eq (ties or loses); hard equality is the
+        correct, parameter-free factor."** **Track A is DONE.**
+
       **PIVOT (2026-05-28): two-track plan, method UNLOCKED.** After the
       codex gpt-5.5-xhigh second opinion + critique, the dead learned-ψ
       thesis is replaced by a two-track plan (active plan:
@@ -337,11 +398,11 @@ diffusion-ebm/
         (real joint-LM-scored best-of-N, not the ≈argmax `best_of_n_cheap`),
         and `predicted_group_hard_eq` (de-oracle probe). Decision rule in
         the plan.
-      - **Track A (weeks 2–4, safety net, NOT where effort goes):** ship
-        framing (a) — "cheap joint decoding helps ~9–14 pp at matched FLOPs;
-        hard equality suffices, learned factor adds nothing; no-free-lunch
-        boundary." Do NOT run the test-split sweep until Track 0 adds the
-        honest baselines.
+      - **Track A (weeks 2–4, safety net, NOT where effort goes) — DONE
+        2026-05-29:** ships framing (a) — "cheap joint decoding helps ~7–15 pp
+        at matched FLOPs; hard equality suffices, learned factor adds nothing
+        (ψ ≤ hard_eq); no-free-lunch boundary." Test-split sweep ran with the
+        full Track-0 baseline set; see TRACK A TEST-SPLIT block above.
       - **Track B (weeks 2–7, the hiring artifact, marginal effort goes
         here):** latent-partition RMC as **correlation clustering** —
         attraction (equality) + a NEW antiferromagnetic **repulsion /
@@ -358,6 +419,183 @@ diffusion-ebm/
       the RMC benchmark itself (`tasks/rmc.py`, `build_rmc.py`,
       `data/rmc/*.jsonl`) — Track B adds a latent-partition *view*, never
       mutates the frozen artefacts.
+
+      **TRACK B SCOUT FINDINGS (2026-05-30) — three fail-fast probes, all on
+      the dev split / real MDLM logit fields, pure-numpy exact ground truth.**
+      Built before committing sampler effort; they reshaped the thesis.
+
+      1. **Splitability probe (`experiments/probe_splitability.py`) — YELLOW.**
+         Exact marginal partition posterior p(z) over the REAL over-merged dev
+         multi_chain Jaccard components, under the proposed frustrated energy
+         `Σ unary + Σ w_ij(2a−1) + λ Σ(2a−1)(2s−1)` (a=same group, s=same
+         token, w_ij=β(J_ij−τ)), swept over a (λ,β) grid. Question: can a single
+         (λ,β) recover the entity splits Jaccard over-merges WITHOUT collapsing
+         correct merges? Best `go_score = min(split_recovery, merge_preservation)
+         = 0.441` at (λ=0.5, β=4); split-recovery ceiling ~0.41–0.44, robust to
+         the τ sweep. Diagnosis: bounded above by the **top-k support ceiling**
+         (gold token in MDLM top-32 only 61% of masked entities; top-1 22%) +
+         token-vs-entity confusion. Because this is the EXACT posterior, *any*
+         sampler is bounded by it, and on the small components RMC produces
+         (n≤5) exact enumeration is cheap → no sampling advantage on real RMC.
+         Cache: `results/probe_splitability_cache.json` (one MDLM forward/item,
+         reused by the other two probes); report `results/probe_splitability.json`.
+
+      2. **Hardness-dial scout (`experiments/probe_hardness_dial.py`) — GREEN,
+         thesis sharpened.** Dials hardness directly: frustrated Potts, n holes
+         over a shared L=4 alphabet, unary = real MDLM logit fields, couplings =
+         controlled spin-glass (random ± w, repel_frac 0.5). EXP A (Pareto):
+         exact brute force vs THRML block-Gibbs as n grows — crossover at n≈11
+         (exact 1.79 s vs Gibbs 1.60 s), exact INFEASIBLE at n≥12 (L^n>16.8M),
+         Gibbs ~flat (0.55→2.7 s) AND faithful (TV≈0.02) in the checkable
+         regime. EXP B (metastability): at fixed n=8, sweep w — TV(Gibbs,exact)
+         is ~0 for w≤4 but jumps to ~0.58 at w≥8 (single-chain Egap 3.44 nats,
+         mapAcc→0.375). **(EXP E correction: these w≥8 single-chain numbers are a
+         single-instance draw from a HIGH-VARIANCE estimator — over 8 instances
+         single-chain TV is 0.19±0.22; the robust, low-variance metastability
+         signal is the independent-ensemble TV 0.49±0.11. The wall is real; the
+         single-chain point estimate is not the way to report it.)** EXP B2: TV
+         flat (~0.70) across burn_in 50→3200 → genuine **metastability** (energy
+         barriers), not slow mixing. Report:
+         `results/probe_hardness_dial.json`. CAVEATS: exact=brute force (but a
+         complete graph has treewidth n−1, so smart exact is also exponential);
+         Gibbs has a ~0.5 s CPU/JAX overhead floor (crossover is conservative);
+         dense graphs force single-node DSATUR blocks — worst-case *throughput*
+         (zero parallelism), NOT a mixing penalty (chromatic blocks are
+         conditionally independent, so block size leaves the transition kernel
+         identical to a single-site scan). EXP D (below) confirms the wall is
+         frustration-driven and persists at every graph density.
+
+      3. **Tempering probe (`experiments/probe_tempering.py`) — the barrier
+         IS crossable; this is the hero figure.** Faithful pure-numpy block-Gibbs
+         (exact Potts conditionals; identical algorithm to THRML on a dense graph,
+         validated against the same exact enumerator) with temperature `logit/T`,
+         comparing vanilla (T=1) vs geometric annealing vs **parallel tempering**
+         (K=8 geometric temps to 2w, even/odd adjacent swaps, accept
+         `min(1,exp((β_a−β_b)(U_b−U_a)))`) on the hard instances (n=8, w∈{8,16},
+         8 instances, 512 chains). Result (`results/probe_tempering.json`):
+         | w | vanilla TV | annealed TV | PT TV | PT cost |
+         |---|---|---|---|---|
+         | 8  | 0.369 | 0.198 | **0.006** | ~9× |
+         | 16 | 0.410 | 0.312 | **0.008** | ~9× |
+         PT restores marginal fidelity to the **Monte-Carlo noise floor**
+         (~0.008 for 51 k samples over L=4) where single-T Gibbs is metastable;
+         annealing only partially crosses. **Important correction to the
+         hardness-dial Egap:** with 512 *independent* parallel chains, Egap=0 for
+         ALL methods (random restarts find the MAP basin at n=8) — the 3.44-nat
+         gap was specifically THRML's *single*-chain MAP failure. The
+         restart-robust barrier lives in the **marginals / sampling task** (the
+         one the TSU actually accelerates — partition function, latent-partition
+         posterior, uncertainty), and PT is what crosses it, at a ~9× compute
+         premium. That premium IS the hardware argument: native-temperature
+         sampling hardware amortises the replica cost.
+
+         **EXP D (sparsity sweep, n=8, w=16, ER density p∈{0.2…1.0}):** separates
+         the two hardware-relevant axes the dense complete graph conflates.
+         | p | edges | DSATUR colors | parallelism (n/colors) | vanilla TV | PT TV |
+         |---|---|---|---|---|---|
+         | 0.2 | 5.5 | 2.2 | 3.67 | 0.306 | 0.004 |
+         | 0.5 | 13.9 | 3.4 | 2.42 | 0.349 | 0.004 |
+         | 1.0 | 28.0 | 8.0 | 1.00 | 0.385 | 0.006 |
+         (1) **Parallelism RISES as the graph sparsifies** (big color classes) —
+         the throughput win; the complete graph is the worst case (1 node/step).
+         (2) **The metastability wall PERSISTS at every density** (vanilla TV
+         0.30–0.39 even at 5.5 edges) → it is a property of frustration
+         *strength*, NOT of blocking; the earlier "single-node block = worse
+         mixer" framing was wrong (chromatic blocks don't change the kernel).
+         (3) **PT crosses it at every density** (TV 0.003–0.006, MC floor). So
+         tempering is required regardless of sparsity — the two hardware wins are
+         orthogonal: sparse-graph block parallelism (throughput) AND
+         native-temperature replicas (barrier crossing).
+
+         **EXP E (THRML↔numpy cross-validation + chain-strategy correction,
+         n=8, w=16, p_T∝exp(U/T) temperature sweep, 8 instances).** Built to
+         answer "is the numpy PT figure a faithful THRML proxy?" — and it
+         corrected a framing error. THRML's `SamplingSchedule(burn,n_chains,1)`
+         is ONE zero-init chain recording `n_chains` autocorrelated samples, NOT
+         independent parallel chains. Separating the two strategies (mean±std TV
+         vs exact over 8 instances):
+         | T | w/T | H_exact | TV(thrml,ex) | TV(np-1chain,ex) | TV(np-512indep,ex) | TV(thrml,np-1chain) |
+         |---|---|---|---|---|---|---|
+         | 1  | 16 | 0.41 | 0.19±0.22 | 0.40±0.34 | **0.49±0.11** | 0.39 |
+         | 16 | 1  | 1.37 | 0.06±0.03 | 0.05±0.01 | 0.005 | **0.069** |
+         Three conclusions:
+         (1) **Proxy claim CONFIRMED.** In the mixing regime (T≥16) numpy single
+         chain reproduces THRML to sampling noise (TV(thrml,np)=0.069 at T=16,
+         0.045 at T=32). The large low-T TV(thrml,np)=0.39 is two single chains
+         trapping in *different* basins — not a kernel mismatch (both differ from
+         exact by ±0.2–0.34). The numpy PT figure is a faithful extension of
+         THRML's kernel; THRML simply doesn't expose replica state/swaps.
+         (2) **The strong-coupling target is PEAKED, not equal-weight multimodal.**
+         Exact marginal entropy at T=1 is 0.41 nats (uniform = log4 = 1.39) → the
+         equilibrium concentrates on a dominant basin. "Hardness" = barrier
+         trapping that stops chains reaching that basin, not averaging over many
+         equal modes.
+         (3) **State the wall via the ENSEMBLE, not a single chain.** The
+         independent 512-chain ensemble robustly over-disperses (TV 0.49±0.11,
+         low variance — chains stuck across init basins they should rarely
+         occupy); this is the strategy hardware runs (many replicas) and the
+         EXP-C "vanilla" baseline. A *single* chain has the same barrier but its
+         TV is dominated by init luck (0.19–0.40 with std ±0.2–0.34). **The
+         hardness-dial EXP B single-instance "TV=0.58 / Egap=3.44" was one
+         unlucky draw from this high-variance single-chain estimator** — the
+         robust metastability signal is the ensemble over-dispersion, which EXP C
+         already uses as its baseline and PT robustly fixes. So the EXP-C hero
+         figure stands (and is *better* motivated); only the single-chain EXP-B
+         point estimates need the variance caveat.
+
+      4. **Full-window partition-hardness probe
+         (`experiments/probe_partition_hardness.py`) — closes the last open
+         question: real RMC does NOT land in the hard regime.** Scout 1
+         measured the wrong object (per-entity Jaccard *components*, n≤5, 7
+         over-size dropped). Scout 4 measures the right one: the **joint
+         latent-partition posterior over ALL n holes of a window** (n=4..10 in
+         the cache), exact at the realistic L=256. Model = frustrated correlation
+         clustering `log p(z)=Σ_g poolZ(g)+Σ_{i<j}β(J_ij−τ)(2[z_i=z_j]−1)`, where
+         `poolZ(g)=logsumexp_t Σ_{h∈g} l_h(t)` over the intersection of the
+         group's top-k cand vocab (hard within-group equality = Track A's
+         hard_eq_map pooling, *summed* not *maxed*). The token marginal
+         **factorises per group**, so precompute poolZ for all ≤2^n−1 hole-subsets
+         once, then each Bell(n) partition is a sum over its groups — NO L^n joint
+         enumeration (256^10≈1e24 hopeless → Bell(10)=115975, <1s). Engine
+         validated: subset-precompute vs direct per-group max|err|=7e-15; β=0 MAP
+         is all-singletons on every item (pooled-PoE structurally prefers
+         splitting — merges come ONLY from the Jaccard prior); full posterior
+         independent recompute max|Δp|=0, normalises to 1. Two readouts over all
+         240 dev items:
+         - **EXP1 census (β sweep 0/2/4/8, τ=0.3).** Real posteriors are
+           **ambiguous but exactly tractable.** @β=4: mean p(MAP)=0.66, 80% have
+           p(MAP)<0.9, **53% genuinely multimodal** (Hfrac>0.2); max Bell-enum
+           wall **0.98s** (n=10). Gold largely **unrecoverable**: MAP==gold 0.11,
+           ARI 0.34, p(gold) 0.09 (top-k support ceiling from scout 1, confirmed;
+           rises only to 0.20/0.41/0.18 at β=8). So the partition posterior is a
+           meaningful non-trivial object (good for motivating the latent-partition
+           framing) yet computable exactly in sub-second time → **no sampler/
+           hardware advantage on real RMC.**
+         - **EXP2 metastability (top-8 most-ambiguous items, Hfrac 0.52–0.73,
+           partition-space single-site block-Gibbs).** Even at maximal real
+           ambiguity there is **no barrier**: single-T vanilla ensemble reproduces
+           the exact co-clustering marginals to **TV=0.008** (MC floor); PT 0.005
+           (also floor, swap 0.79–0.88). Tempering buys nothing because nothing is
+           trapped. Contrast the synthetic dialed regime (scouts 2/3): single-T TV
+           0.4–0.6, PT required. **ambiguity ≠ hardness** — real RMC frustration
+           (weak Jaccard couplings, small n) yields posterior *uncertainty*
+           without barrier-separated modes; the barrier-protected metastability
+           that motivates the hardware requires the *dialed* strong frustration
+           (w≥8, n≳12) that does not arise in n≤10 LM-grounded RMC graphs.
+         Report: `results/probe_partition_hardness.json` (census_sweep ×4 β,
+         census_rows ×240, metastability ×8). Reuses scout-1 cache + partition
+         helpers; pure numpy, no GPU.
+
+      **Reshaped Track B thesis (post-scout):** NOT "block-Gibbs beats exact"
+      (false on real RMC — instances are too small/easy) but: *a frustrated,
+      LM-grounded Potts model has a genuine intractable regime (n≳12, dense,
+      strong coupling) where block-Gibbs is the only feasible sampler; the
+      equilibrium target there is sharply peaked but barrier-protected, so an
+      independent block-Gibbs replica ensemble robustly over-disperses
+      (burn-in-invariant metastability wall); parallel tempering / replica
+      exchange crosses it to the Monte-Carlo floor at a quantified ~9× compute
+      premium that motivates native-temperature hardware.* The hero figure is the
+      Pareto+metastability+tempering triptych, not an RMC accuracy number.
 
       Three seeds + item-level bootstrap CIs and wall-clock cost measurement
       remain as the weeks 10–11 buffer for whichever track becomes the
@@ -599,16 +837,58 @@ canonical reference if a future API change confuses things.
     ~0% / hurts (owt 0%, wt −29%; over-merge 0.11–0.13, ARI ~0.50) → Jaccard
     over-merges distinct entities — the SAME failure as ψ_global, and exactly
     the gap Track B's repulsion/inequality factor is designed to close.
-  - **Track A headline gate (verification table) PASSES on dev:** (best joint
-    − argmax) SIG on both multi cells; (joint − best_of_n_strong) SIG on all
-    4; (ψ − hard_eq_oracle) CI includes 0 on all 4. Still must re-confirm on
-    the test split before the paper's headline table.
-- **Track B open questions:**
-  - Can the attraction+repulsion (frustrated) graph stop the `ψ_global`
-    over-merge collapse and recover entity partition (grouping ARI) without
-    oracle labels?
-  - Is there a Pareto regime where block-Gibbs strictly dominates argmax,
-    exact pooling, and best-of-N — the hardware-justifying figure?
+  - **Track A headline gate (verification table) PASSES on dev AND test
+    (test confirmed 2026-05-29):** (best joint − argmax) SIG on all 4 cells;
+    (joint − best_of_n_strong) SIG on all 4; (hard_eq_map ≥ oracle) on all 4.
+    The (ψ − hard_eq_oracle) CI includes 0 on 3 cells but is **SIG-worse on
+    wt_single** (−0.023 [−0.044, −0.001]) — the learned-ψ claim is now
+    "ψ ≤ hard_eq (ties or loses)", not "ψ ≈ hard_eq". This does not threaten
+    the Track A headline (hard equality is the shipped factor). **Track A is
+    DONE; the paper's headline table is locked.**
+- **Track B open questions — SCOUTED 2026-05-30 (3 probes, see Track B SCOUT
+  FINDINGS block above), thesis reshaped:**
+  - Can the attraction+repulsion graph recover entity partition without oracle
+    labels on REAL RMC? → **Largely NO (splitability probe).** The exact
+    partition posterior caps split-recovery at ~0.44 (top-k support ceiling,
+    not a sampler failure); on RMC's small components (n≤5) exact is cheap, so
+    sampling buys nothing on the real benchmark. RMC is the wrong place to
+    showcase the sampler.
+  - Is there a regime where block-Gibbs strictly dominates exact/pooling/BoN?
+    → **YES, but it is the *dialed-hardness synthetic* regime, not RMC**
+    (hardness-dial scout): n≳12 dense frustrated Potts with real MDLM fields —
+    exact infeasible (L^n>16.8M), Gibbs flat+faithful. The hardware-justifying
+    figure is the Pareto crossover + metastability wall + tempering rescue, NOT
+    an RMC accuracy delta.
+  - Does single-T block-Gibbs survive strong coupling? → **NO — metastability
+    wall at w≥8 (TV→0.6), burn-in-invariant.** Does tempering cross it? →
+    **YES (tempering probe): parallel tempering restores TV to the MC floor
+    (0.41→0.008) at ~9× compute; annealing only partially.** The ~9× premium is
+    itself the argument for native-temperature sampling hardware.
+  - Does the wall survive on a *sparse* frustrated graph? → **YES (tempering
+    EXP D, n=8 w=16, density sweep).** The metastability wall persists at EVERY
+    density (vanilla TV 0.30–0.39 even at 5.5 edges); PT stays at the MC floor
+    (0.003–0.006) throughout. Block size is **parallelism, not mixing** —
+    chromatic blocks are conditionally independent, so sparsity raises THRML
+    throughput (parallelism n/colors 1.0→3.67) WITHOUT changing the transition
+    kernel. The two hardware wins are orthogonal: sparse-graph block parallelism
+    (throughput) AND native-temperature replicas (barrier crossing).
+  - Does the FULL-WINDOW real RMC partition posterior (not the per-entity
+    components scout 1 measured) land in the hard regime? → **NO (scout 4,
+    `probe_partition_hardness.py`).** Exact partition posterior over all n holes
+    (n≤10), full L=256, via pooled-PoE per-group factorisation (Bell(10)=116k,
+    <1s; the naive L^n=256^10≈1e24 never enumerated). Real posteriors are
+    *ambiguous* (53% multimodal, p_MAP~0.66 @β=4) but exactly solvable in
+    sub-second time, AND single-T partition-Gibbs mixes to the MC floor (TV
+    0.008) even on the most ambiguous items — **no barrier, ambiguity≠hardness.**
+    Gold grouping largely unrecoverable (MAP==gold 0.11 @β=4 — top-k ceiling).
+    The hard regime (barrier-protected metastability needing PT) is reached only
+    by *dialing* synthetic frustration; no real cache graph reaches it. **The
+    open "is there a real hard task?" question is CLOSED with a measured negative
+    → the hero figure is legitimately synthetic.**
+  - REMAINING: (a) implement PT inside THRML or accept the numpy reference
+    sampler for the paper figure? [(b) "is there a non-RMC benchmark in the hard
+    regime?" — superseded: scout 4 closed it for RMC; finding such a task is now
+    optional future work, not a blocker for the synthetic hero figure.]
 - **Variable template framing** — `' x'` is outside MDLM's top-256 in
   prose context. Current "1.000 agreement" is on `' variable'`/`' that'`.
   Must be framed as a top-k ceiling example in the paper, not a success.
