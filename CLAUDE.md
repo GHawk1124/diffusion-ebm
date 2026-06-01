@@ -171,6 +171,52 @@ diffusion-ebm/
                                #   ambiguous items → no barrier; ambiguity≠hardness.
                                #   Closes the open question: hard regime is synthetic
                                #   only. (imports probe_splitability helpers; numpy)
+    probe_hw_common.py         # Classical-gauntlet shared harness (pure numpy):
+                               #   Factor/FactorGraph/potts_pairwise, exact_marginals
+                               #   (brute+co-cluster), variable_elimination_marginals,
+                               #   block_gibbs, parallel_tempering, gauntlet_ais
+                               #   (now returns log_z), gauntlet_mean_field/_trw_bp/
+                               #   _best_of_n, mean_hellinger/co_tv, UAI .MAR IO.
+    probe_factor_graph_inference.py # Probe D: loopy-BP + full gauntlet on real UAI
+                               #   MAR grids, exact-VE gold, honest scorecard.
+    probe_gauntlet_dial.py     # Gauntlet across the synthetic hardness dial
+                               #   (AIS DOMINATES PT on marginals at every scale).
+    probe_ais_vs_pt.py         # AIS-vs-PT first-order shot: EXP P (sweep w) /
+                               #   EXP S (forced supercooling, schedule resolution) /
+                               #   EXP M (matched compute). All negative → principled
+                               #   first-order shot CLOSED. report probe_ais_vs_pt.json
+    probe_logz.py              # Route-2 logZ/free-energy probe: AIS logẐ vs PT
+                               #   thermodynamic-integration vs exact logZ. EXP ZF
+                               #   (ferro schedule sweep: 1.46-nat logẐ bias @5 temps
+                               #   while overlap=1.000, recovers @400 temps) + EXP ZG
+                               #   (spin-glass no-escape NEGATIVE: AIS logẐ survives
+                               #   ESS collapse ≤0.087 nats, PT-TI worse). Route 2
+                               #   CLOSED. report results/probe_logz.json
+    probe_first_order.py       # Route-3 (the last shot): engineered no-escape
+                               #   first-order instance. Two EXTENDED ASYMMETRIC
+                               #   basins (deep-narrow 3-body A vs wide-shallow 2-body
+                               #   B = density-of-states competition, dodges ferro MF
+                               #   escape). EXP FO-A/B single-basin funnel control;
+                               #   FO-C/D two-basin double-well. VERDICT: genuine
+                               #   first-order well BUILT (single-T Gibbs trapped, gap
+                               #   0.137) but AIS crosses on every observable (basin-
+                               #   occ err 0.000 @5→800 temps); AIS anneals from β=0
+                               #   where wells haven't formed → never crosses barrier.
+                               #   Route 3 CLOSED → only framing (i) survives. report
+                               #   results/probe_first_order.json
+    probe_planted.py           # Large-n PLANTED route (the last un-closed door):
+                               #   frustrated Potts glass + planted reward on the
+                               #   (t*_i,t*_j) edge entry → plant-overlap is ground
+                               #   truth where exact Z is GONE. Triangulated validation
+                               #   (soft/hard overlap, clamped-at-plant stability ctrl,
+                               #   score vs score(t*), full gauntlet). VERDICT: sparse =
+                               #   continuous transition, NO barrier; dense (n=48,q=5,
+                               #   deg=12,frust=5; 5^48≈3.5e33) = genuine large-n
+                               #   metastability wall (single-T Gibbs trapped, burn-in-
+                               #   invariant, overlap gap ~0.06-0.12) but PT AND AIS both
+                               #   cross to ≤0.024 → NO PT-unique window. Obstruction
+                               #   holds at large n; cleanest framing-(i) confirmation.
+                               #   report results/probe_planted.json (+_frust4/_dense_hunt)
 
   src/diffusion_ebm/tasks/
     winogrande.py              # WG dataclass + build_items (appendix material)
@@ -197,7 +243,7 @@ diffusion-ebm/
                                #   /storage/scratch1/1/gcomes3/diffusion-ebm/
 ```
 
-## Status (2026-05-31, M5d Track A test-split LOCKED — joint factor-graph decoding beats independent argmax by +7–15 pp on the held-out test split (all 4 cells SIG); hard_eq_map (closed-form pooling) DOMINATES the sampler; learned ψ ≤ hard equality (SIG-worse on wt_single). Track A is DONE. Track B SCOUTED via 4 fail-fast probes — RMC is too easy for the sampler (splitability ceiling 0.44; scout-4 full-window partition posterior is ambiguous but exact-in-<1s AND mixes to the MC floor TV=0.008 → no barrier, ambiguity≠hardness, real-hard-task question CLOSED negative), BUT a dialed-hardness frustrated Potts has a genuine regime (n≳12) where exact dies + single-T Gibbs hits a burn-in-invariant metastability wall (w≥8) + parallel tempering crosses it (TV 0.41→0.008 at ~9×). Thesis reshaped: hero fig = Pareto+metastability+tempering, legitimately SYNTHETIC, NOT RMC accuracy. See Track B SCOUT FINDINGS block + plan file)
+## Status (2026-05-31, M5d Track A test-split LOCKED — joint factor-graph decoding beats independent argmax by +7–15 pp on the held-out test split (all 4 cells SIG); hard_eq_map (closed-form pooling) DOMINATES the sampler; learned ψ ≤ hard equality (SIG-worse on wt_single). Track A is DONE. Track B SCOUTED via 4 fail-fast probes — RMC is too easy for the sampler (splitability ceiling 0.44; scout-4 full-window partition posterior is ambiguous but exact-in-<1s AND mixes to the MC floor TV=0.008 → no barrier, ambiguity≠hardness, real-hard-task question CLOSED negative), BUT a dialed-hardness frustrated Potts has a genuine regime (n≳12) where exact dies + single-T Gibbs hits a burn-in-invariant metastability wall (w≥8) + parallel tempering crosses it (TV 0.41→0.008 at ~9×). Thesis reshaped: hero fig = Pareto+metastability+tempering, legitimately SYNTHETIC, NOT RMC accuracy. See Track B SCOUT FINDINGS block + plan file. **CAVEAT (2026-05-31, gauntlet+AIS): the metastability "wall" is only a wall vs the WEAK single-T-Gibbs incumbent — classical AIS (annealed importance sampling, single-machine) crosses it cheaply and DOMINATES PT on marginal inference at every scale with exact ground truth, including AIS's textbook first-order failure mode (probe_ais_vs_pt.py, three exps all negative). All FOUR escape routes are now CLOSED: marginal inference (probe_ais_vs_pt), logZ/free-energy (probe_logz — AIS logẐ survives ESS collapse on the no-escape spin glass), the engineered first-order double-well (probe_first_order — genuine barrier built, single-T Gibbs trapped, but AIS crosses on every observable), and the large-n PLANTED glass (probe_planted — at n=48,q=5,dense, 5^48 states/exact-gone, a real burn-in-invariant metastability wall traps single-T Gibbs but PT AND AIS both cross to ≤0.024 plant-overlap; the obstruction holds at the only scale where it could have broken). The "no classical escape" claim is RETIRED; only framing (i) survives — "PT vs single-T block-Gibbs at matched temperature count," with AIS acknowledged as a stronger classical baseline that also crosses the wall. See GAUNTLET + AIS-vs-PT FINDINGS block (items 1–6).**)
 
 - [x] **M0** — project skeleton, env install, smoke test (PASS).
 - [x] **M1** — Potts chain MVP0 (PASS: independent 0/500 fully aligned;
@@ -601,6 +647,234 @@ diffusion-ebm/
       remain as the weeks 10–11 buffer for whichever track becomes the
       headline.
 
+      **GAUNTLET + AIS-vs-PT FINDINGS (2026-05-31) — the "no classical escape"
+      claim does NOT hold on marginal inference; the principled first-order shot
+      is CLOSED.** Built the full classical gauntlet into a shared pure-numpy
+      harness and ran it against both real published instances and the synthetic
+      dial to test whether ANY validatable regime exists where the *whole*
+      classical toolbox fails while PT/replica-exchange uniquely recovers
+      marginals. It does not. New files (all pure numpy, run on system python, no
+      GPU): `experiments/probe_hw_common.py` (shared harness: `Factor`/
+      `FactorGraph`/`potts_pairwise`, `exact_marginals` brute+co-cluster,
+      `variable_elimination_marginals` min-fill, `block_gibbs`,
+      `parallel_tempering`, and the gauntlet `gauntlet_ais` / `gauntlet_mean_field`
+      / `gauntlet_trw_bp` / `gauntlet_best_of_n`, plus `mean_hellinger` / `co_tv`
+      / UAI `.MAR` IO); `experiments/probe_factor_graph_inference.py` (Probe D:
+      loopy BP + full gauntlet on real UAI MAR instances, exact-VE gold, honest
+      scorecard); `experiments/probe_gauntlet_dial.py` (gauntlet across the
+      synthetic hardness dial); `experiments/probe_ais_vs_pt.py` (the
+      first-order + matched-compute + schedule-resolution probe). Findings:
+
+      1. **UAI MAR grids (Grids_12–14) — honest FAIL on "no escape" (G1b/G5).**
+         Junction-tree VE solves all three EXACTLY (induced width 13–23). The
+         gauntlet on these: loopy-BP 0.24–0.57, TRW-BP 0.22–0.46, mean-field
+         0.45–0.53, **AIS 0.06–0.11** (strongest classical sampler but still
+         >0.05 fail), best-of-N 0.35–0.63, single-T Gibbs 0.31–0.43, PT
+         0.005–0.083 (Hellinger to exact). PT wins but the instance is *tractable*
+         (VE exact) → no hardware argument. Verdict: TRACTABLE REGIME.
+
+      2. **Synthetic dial (random-MDLM-field frustrated Potts) — AIS DOMINATES PT.**
+         At n=10 sweeping w 0→16, AIS Hellinger stays 0.014–0.031 (PASSING < 0.05)
+         while BP/TRW/MF/best-N fail at strong coupling and single-T Gibbs rises
+         0.004→0.45. AIS at n=10,w=16 = 0.014 in 0.57 s vs PT 0.004 in 11 s — PT
+         is more accurate but uses ~14× compute merely to tie a passing AIS. AIS
+         ESS collapses (0.94→0.17 with w) so it *feels* hardness, but Hellinger
+         stays low because the random-field target is **peaked** (one dominant
+         basin). Field-scale sweep confirms robustness: at fs=0 (symmetric,
+         multimodal) AIS still passes 0.019–0.038 while TRW=MF=0.000
+         (variationally trivial — exact marginal uniform); at fs=0.25 AIS passes
+         while BP/MF/best-N/Gibbs fail. AIS is unbreakable across the whole
+         (field × coupling) plane at every n with exact ground truth.
+
+      3. **The principled first-order shot (`probe_ais_vs_pt.py`) — CLOSED, three
+         experiments, all negative.** AIS's one textbook failure mode is a
+         *first-order phase transition* (chains supercool past a free-energy
+         barrier → biased, not just noisy; PT tunnels). Tested on the cleanest
+         exactly-solvable first-order system, the fully-connected q=4 ferromagnetic
+         Potts (CAVEAT: it has a mean-field solver escape, so it demonstrates the
+         MECHANISM with clean ground truth, it is NOT itself a no-escape instance).
+         - **EXP P** (sweep w 0.5→8 at n=10, 400-temp ladder): AIS tracks exact
+           *overlap AND marginals* at every coupling (overlap err <0.01 even at
+           w=8 where exact overlap 0.998). ESS collapses to 0.71 but accuracy
+           holds. The flat H_AIS≈0.036 vs PT's 0.003 is a sample-count floor (AIS
+           = n_chains endpoint samples; PT = n_chains×n_measure), not bias.
+         - **EXP S** (forced supercooling: fix w=6, exact overlap 0.985, throttle
+           AIS to 5→400 temps): even at **5 temps** (ESS 0.019) AIS overlap stays
+           0.982 — NO disordered-phase trap. The only degradation is per-node
+           marginal Hellinger (0.244→0.037 as temps rise) = ESS-collapse
+           symmetry-sector noise. Overlap is robust because all 4 ordered Potts
+           sectors give overlap≈1, so a fast-quenched chain in the "wrong" sector
+           still has correct overlap. At matched compute AIS is competitive-or-
+           better than PT except at trivially tiny budgets where BOTH fail.
+         - **EXP M** (matched site-sweep budget, w=3): PT's small edge (H 0.002–
+           0.011 vs AIS 0.029–0.040) is sample-throughput on a barrier-free target
+           (PT harvests n_measure× more β=1 samples; AIS gets a fine 800–12800-temp
+           ladder, ESS 0.99), NOT replica-exchange tunneling. No cost-justified PT
+           advantage. Report: `results/probe_ais_vs_pt.json`.
+
+      4. **The logZ / free-energy pivot (`probe_logz.py`, route 2) — CLOSED on
+         the no-escape instance; only the escape-instance mechanism survives.**
+         AIS's importance weights also estimate logZ (logẐ = logZ_0 +
+         logsumexp(logw) − log N, unbiased in Ẑ → biased LOW in logẐ by Jensen as
+         ESS→0), so logZ is a *more sensitive* observable than the marginals. The
+         decisive test: a cell where AIS marginals PASS (<0.05 H) but AIS logẐ is
+         badly biased while PT-thermodynamic-integration (logZ = logZ_0 +
+         ∫_0^1⟨U⟩_β dβ, replica exchange per rung) recovers exact logZ. Validated
+         PT-TI vs exact to 0.002–0.003 nats. Two experiments (n=10, q=4, exact
+         logZ gold):
+         - **EXP ZF (ferro, schedule sweep, w=8):** the *genuinely new* finding —
+           logZ is dramatically more schedule-sensitive than the order parameter.
+           At 5 temps AIS logẐ is off by **1.46 nats** (0.15/site, ~4.3× in Z;
+           ESS 0.025) **while overlap = 1.000 (perfect)**. PT-TI = 0.002 nats. So
+           logZ exposes a failure the overlap completely hides. BUT well-resolved
+           AIS recovers (400 temps → 0.029 nats) → it's an ESS/discretization
+           Jensen bias fixed by *adding temps*, NOT a barrier PT *uniquely*
+           crosses; and the ferro has the MF/sector-sum escape.
+         - **EXP ZG (frustrated spin glass, the no-clean-escape instance, w up to
+           16):** the decisive NEGATIVE. AIS marginals pass everywhere (H
+           0.028–0.045) AND AIS logẐ *survives* ESS collapse (|Δ|≤0.087 nats even
+           at w=16, ESS 0.18). Worse for the thesis, **PT-TI is *worse* than AIS at
+           strong coupling** (|Δ| 0.403 vs 0.087 at w=16). logZ does NOT expose
+           hardness the marginals hide on a no-escape instance, and PT is not
+           uniquely better. Report: `results/probe_logz.json`.
+         **Unifying obstruction (now crisp):** AIS's logZ failure needs a
+         *first-order coexistence barrier* on the annealing path. The only small-n
+         systems with that AND exact gold are mean-field-solvable (ferro → escape);
+         the no-escape frustrated systems we can build are *peaked* (spin-glass,
+         continuous transition) → no coexistence barrier → AIS survives on EVERY
+         observable. The negative extends from marginals to logZ.
+
+      5. **The engineered-first-order route (`probe_first_order.py`, route iii) —
+         CLOSED; the obstruction confirmed empirically.** Route (iii) was the last
+         shot: *explicitly construct* a no-escape first-order instance (not a
+         collective spin-ordering transition, so no ferro MF/gauge escape) and check
+         whether AIS supercools past the barrier while PT crosses, with exact gold at
+         n≤9. The textbook AIS-killer is a **density-of-states / entropy-energy
+         competition**: a DEEP+NARROW basin (low entropy) versus a WIDE+SHALLOW basin
+         (high entropy), so AIS over-commits during annealing to whichever basin
+         captures chains first. Construction = frustrated planted Potts (n=8, q=4):
+         basin A = dense 3-body clauses toward t_A (cubic-steep mouth, depth jA);
+         basin B = 2-body funnel toward an orthogonal t_B (gentle quadratic mouth,
+         weight jB); random fields + random clause subsets break the match-count
+         sufficient statistic → no 1-D/MF reduction. Order parameter = basin
+         occupancy P_A / P_B (asymmetric → no sector-symmetry robustness). Two
+         experiments (EXP FO-A/B single-basin funnel control; **FO-C/D two-basin
+         double-well**), 3 instances, AIS to 800 temps, exact + PT-TI gold.
+         - **We DID build a genuine first-order double-well.** At jA=1.4 there is real
+           coexistence (exact P_A=0.602 / P_B=0.398, P_none≈0 → two deep wells with a
+           barrier between them) and **single-T Gibbs is provably trapped**
+           (Gibbs P_A=0.465 vs exact 0.602, gap 0.137; across the sweep Gibbs stays
+           "sticky" near its ~0.5 init while true equilibrium swings 0.05→1.0). The
+           barrier is real.
+         - **AIS crosses it anyway, on every observable.** AIS P_A=0.573 (vs exact
+           0.602) at jA=1.4; AIS tracks the full equilibrium swing to ≤0.03 at every
+           jA; PT tracks to ≤0.01. In the schedule discriminator (FO-D) AIS basin
+           occupancy error is **0.000 at every schedule** (5→800 temps); the *only*
+           schedule-sensitive observable is logẐ (1.076 nats at 5 temps) which
+           *recovers* to 0.008 at 800 temps — the same recoverable Jensen/ESS bias as
+           EXP ZF, NOT a PT-unique barrier. Verdicts: obstruction holds (FO-A/B/C/D).
+         - **The deep reason, now empirically confirmed:** AIS anneals from β=0 where
+           the energy scale is washed out and the two wells have NOT formed; it
+           distributes chains on a flat landscape and the wells crystallize *around*
+           the already-placed chains. AIS never has to *cross* the barrier. Only a
+           single-T sampler (starting at β=1 with the barrier already present) gets
+           trapped. So a barrier that defeats naive Gibbs does NOT defeat AIS — and
+           this holds for the most explicitly-engineered first-order landscape we can
+           build at exact-gold scale. **There is no no-escape first-order instance at
+           small exact-gold n. Route (iii) is CLOSED.** Report:
+           `results/probe_first_order.json`.
+
+      6. **The large-n PLANTED route (`probe_planted.py`) — CLOSED; the strongest
+         large-n version of the obstruction, and the cleanest framing-(i)
+         confirmation.** The one un-closed door after routes (i)–(iii): every prior
+         test had exact gold only at n≤10, where first-order barriers are too weak to
+         bias AIS. Go LARGE-n (exact Z gone) and replace exact gold with a PLANTED
+         signal. Construction = frustrated Potts glass: random N(0,frust²) coupling
+         tables on a graph + a planted reward `signal` added to the (t*_i,t*_j) entry
+         of every edge (t* = fixed random colouring), which breaks the q!
+         colour-permutation symmetry so **overlap with t* is an unambiguous recovery
+         handle without needing Z**. Triangulated validation: soft/hard plant overlap;
+         a **clamped-at-plant control** (init at t*, run β=1 Gibbs — overlap retention
+         certifies t* is a deep stable state, so failure-to-recover is a barrier not an
+         unstable plant); score vs score(t*); full gauntlet (single-T Gibbs / AIS / PT /
+         mean-field / TRW-BP / best-of-N). The hoped-for win: in the glassy hard phase
+         AIS supercools into decoys while PT recovers t*.
+         - **Sparse/weak regimes give a CONTINUOUS transition → no barrier at all.**
+           n=64, deg 3–4, frust 1–4: planting-on-every-edge turns recovery on smoothly;
+           single-T Gibbs ≈ PT ≈ AIS ≈ clamp_ov at every signal (PT−AIS ≤0.006). Easy
+           problems are easy — uninformative for the AIS-vs-PT question. (The barrier
+           that traps local samplers needs a *dense* frustrated graph; sparse graphs are
+           locally tree-like.)
+         - **Dense strong regime gives a genuine large-n metastability wall — and AIS
+           crosses it as well as PT.** n=48, q=5, avg_deg=12, frust=5 (state space
+           5⁴⁸≈3.5×10³³, exact hopeless). At signal∈[1.5,3.0], **single-T Gibbs is
+           provably trapped** below the clamp-certified stable level (gibbs plant-overlap
+           0.295/0.340/0.406/0.495 vs clamp_ov 0.415/0.468/0.521/0.613 — gap ~0.06–0.12),
+           and the gap is **burn-in-invariant** (unchanged from burn=400 hunt to burn=600
+           confirmation) → a real barrier, the scout-3 wall reproduced at large n with
+           plant ground truth. **Both PT and AIS cross it, tracking each other to ≤0.024**
+           plant-overlap (matched compute, AIS 400 temps × 8 sweeps vs PT 8 levels;
+           pt_so 0.355/0.384/0.470/0.544 vs ais_so 0.336/0.386/0.470/0.544). AIS sometimes
+           slightly *above* PT. No supercooling: AIS recovers the plant wherever PT does.
+           (t* is only partially recovered — strong glass — but the *relative* PT≈AIS≫Gibbs
+           comparison is decisive; mean-field/TRW-BP/best-of-N all sit below Gibbs.)
+         - **Verdict: NO PT-unique window; obstruction holds at large n.** This is the
+           definitive large-n confirmation of framing (i): a genuine metastability wall
+           that traps the weak single-T incumbent, at n where exact ground truth is gone,
+           is crossed *equally* by PT and by single-machine AIS. The deep reason from
+           route (iii) holds at scale — AIS anneals from β=0 where the glass hasn't frozen,
+           so it never crosses the barrier; only single-T Gibbs (β=1 start) traps. Report:
+           `results/probe_planted.json` (+ `_frust4.json` continuous-transition negative,
+           `_dense_hunt.json` barrier discovery).
+
+      **CONSEQUENCE for Track B (honest, load-bearing).** Track B's existing hero
+      figure (`probe_tempering.py`) shows PT crossing a metastability wall — but
+      the incumbent it beats is **single-T block-Gibbs ensemble over-dispersion**,
+      a WEAK classical baseline. AIS (also classical, single-machine, no special
+      hardware) crosses that same wall cheaply on every instance with exact ground
+      truth. So the marginal-inference route to "PT/TSU uniquely wins where the
+      whole classical gauntlet fails" is **closed at every validatable scale**,
+      including AIS's principled first-order failure mode: the only systems where
+      we can compute exact marginals (n≤10) have first-order barriers too weak to
+      bias a properly-tempered AIS, and the order parameter is robust to schedule
+      under-resolution. The only place PT could uniquely win is large-n where
+      exact ground truth is gone (unfalsifiable — the trap to avoid). The logZ /
+      free-energy pivot that *could* have rescued this was TESTED (item 4,
+      `probe_logz.py`) and is **CLOSED**: logẐ is indeed dramatically more
+      schedule-sensitive than the order parameter (EXP ZF: 1.46-nat bias at 5
+      temps while overlap=1.000), but on the no-escape spin glass AIS logẐ
+      *survives* ESS collapse (≤0.087 nats) and PT-TI is actually *worse* at
+      strong coupling — the ESS-collapse prediction failed exactly where a
+      first-order barrier was needed. The third option, (iii) — *explicitly
+      engineering* a no-escape first-order instance (a deep-narrow vs wide-shallow
+      density-of-states competition, dodging the ferro's MF/gauge escape) — was the
+      last shot and was TESTED (item 5, `probe_first_order.py`) and is **CLOSED**: we
+      DID build a genuine first-order double-well (single-T Gibbs provably trapped,
+      gap 0.137 at the coexistence cell) but AIS crosses it on every observable
+      (basin occupancy error 0.000 at every schedule 5→800 temps; only logẐ is
+      schedule-sensitive and it recovers with temps). The deep reason is now
+      empirically confirmed: AIS anneals from β=0 where the wells haven't formed, so
+      it places chains on a flat landscape and the wells crystallize around them — it
+      never crosses the barrier, only single-T Gibbs (starting at β=1) does. So **all
+      three resolution options are now gone; only framing (i) survives.** The one
+      remaining hope — that the obstruction was an artefact of small exact-gold n and
+      a genuine large-n glassy hard phase would finally trap AIS — was TESTED (item 6,
+      `probe_planted.py`, large-n planted glass with plant-overlap as ground truth) and
+      is **CLOSED**: at n=48, q=5, dense (5⁴⁸ states, exact gone) we DID build a real
+      large-n metastability wall (single-T Gibbs trapped, burn-in-invariant, overlap gap
+      ~0.06–0.12 below the clamp-certified-stable level) but **both PT and AIS cross it
+      to within ≤0.024 plant-overlap** — the same obstruction, now confirmed at the only
+      scale where it could have broken. The honest
+      Track-B synthetic figure must be framed as **"(i) PT vs single-T block-Gibbs at
+      matched temperature count"** — a real metastability wall that defeats the naive
+      single-T ensemble — while explicitly acknowledging AIS as a stronger classical
+      single-machine baseline that ALSO crosses the wall on the marginal, the logZ,
+      AND the basin-occupancy task. The "no classical escape" claim is retired; the
+      defensible claim is the weaker, true one (PT > single-T Gibbs, and the ~9×
+      replica premium motivates native-temperature hardware), and the double-well
+      where Gibbs is trapped but AIS+PT cross is the *cleanest illustration* of why
+      that incumbent is the honest baseline to beat.
+
 ## Environment quirks (NixOS-specific, **important**)
 
 These cost real time to rediscover.  Read before running anything.
@@ -885,10 +1159,54 @@ canonical reference if a future API change confuses things.
     by *dialing* synthetic frustration; no real cache graph reaches it. **The
     open "is there a real hard task?" question is CLOSED with a measured negative
     → the hero figure is legitimately synthetic.**
+  - Is the synthetic metastability wall a wall vs the FULL classical gauntlet,
+    or only vs single-T Gibbs? → **Only vs single-T Gibbs (gauntlet+AIS step 1,
+    2026-05-31).** Classical AIS crosses the wall cheaply and DOMINATES PT on
+    marginal inference at every validatable scale; AIS's principled first-order
+    failure mode does NOT materialise at n≤10 where exact ground truth exists
+    (probe_ais_vs_pt.py EXP P/S/M, all negative). See the GAUNTLET + AIS-vs-PT
+    FINDINGS block. This is the binding threat to the marginal-inference hero
+    figure and must be addressed before the synthetic figure can claim "no
+    classical escape."
+  - Is there a genuinely no-escape FIRST-ORDER instance AIS supercools past
+    while PT crosses? → **NO (route iii, `probe_first_order.py`, 2026-05-31).**
+    Explicitly engineered a deep-narrow vs wide-shallow two-basin Potts (a
+    density-of-states competition that dodges the ferro's MF escape). We DID get a
+    genuine first-order double-well — single-T Gibbs provably trapped (P_A 0.465 vs
+    exact 0.602, gap 0.137 at the coexistence cell) — but **AIS crosses it on every
+    observable** (basin-occupancy error 0.000 at every schedule 5→800 temps; only
+    logẐ is schedule-sensitive and recovers with temps). AIS anneals from β=0 where
+    the wells haven't formed, so it never crosses the barrier; only single-T Gibbs
+    (β=1 start) traps. Route (iii) CLOSED. See GAUNTLET + AIS-vs-PT FINDINGS item 5.
+  - Was the obstruction just a small-n (n≤10 exact-gold) artefact — does a genuine
+    LARGE-n glassy hard phase finally trap AIS? → **NO (large-n planted route,
+    `probe_planted.py`, 2026-06-01).** Replaced exact gold with a planted signal
+    (overlap with t* as ground truth where Z is gone). Sparse planting → continuous
+    transition, no barrier. Dense (n=48, q=5, deg=12, frust=5; 5^48≈3.5e33 states)
+    → a **real large-n metastability wall** (single-T Gibbs trapped, burn-in-
+    invariant, plant-overlap gap ~0.06–0.12 below the clamp-certified-stable level)
+    but **PT and AIS both cross it to ≤0.024** plant-overlap (AIS matched-compute,
+    400 temps). The obstruction holds at the only scale where it could have broken.
+    See GAUNTLET + AIS-vs-PT FINDINGS item 6.
   - REMAINING: (a) implement PT inside THRML or accept the numpy reference
-    sampler for the paper figure? [(b) "is there a non-RMC benchmark in the hard
-    regime?" — superseded: scout 4 closed it for RMC; finding such a task is now
-    optional future work, not a blocker for the synthetic hero figure.]
+    sampler for the paper figure? (b) DECIDE the Track-B framing — **RESOLVED by
+    elimination: only (i) survives.** Of the three options: ~~(ii) pivot to
+    partition-function / free-energy estimation~~ — **CLOSED 2026-05-31
+    (probe_logz.py): on the no-escape spin glass AIS logẐ survives ESS collapse
+    (≤0.087 nats) and PT-TI is *worse* at strong coupling**; ~~(iii) construct a
+    genuinely no-escape first-order instance~~ — **CLOSED 2026-05-31
+    (probe_first_order.py): the engineered double-well has a real barrier (Gibbs
+    trapped) but AIS crosses it at every schedule**; leaving only **(i) honestly
+    narrow the claim to "PT vs single-T block-Gibbs at matched temperature count"**
+    — the shippable framing, with AIS acknowledged as a stronger classical
+    single-machine baseline that also crosses the wall. The "no classical escape"
+    claim is retired. **Net: (i) is THE framing; the double-well (Gibbs trapped,
+    AIS+PT cross) is its cleanest small-n illustration, and the large-n planted glass
+    (`probe_planted.py`, item 6 — Gibbs trapped at n=48/5^48-states, AIS+PT cross) is
+    its large-n confirmation that the obstruction is not a small-n exact-gold
+    artefact.**
+    [(c) "is there a non-RMC benchmark in the hard regime?" — superseded by
+    scout 4 for RMC; optional future work.]
 - **Variable template framing** — `' x'` is outside MDLM's top-256 in
   prose context. Current "1.000 agreement" is on `' variable'`/`' that'`.
   Must be framed as a top-k ceiling example in the paper, not a success.
@@ -918,3 +1236,31 @@ canonical reference if a future API change confuses things.
   - k=256 native retrain eval: `results/m5c_v3_k256_eval.json`
   - RMC eval outputs (to create): `results/m5c_v3_k256_rmc_{owt_heldout,wikitext103}_{dev,test}.json`
 - RMC frozen benchmark artefacts: `data/rmc/*.jsonl` (in repo, committed)
+- Classical-gauntlet probes (pure numpy, system python, no GPU):
+  - `experiments/probe_hw_common.py` — shared harness (factor graph, exact,
+    VE, block-Gibbs, PT, gauntlet AIS/MF/TRW-BP/best-of-N, UAI `.MAR` IO).
+  - `experiments/probe_factor_graph_inference.py` — Probe D, real UAI MAR
+    grids + gauntlet + honest scorecard; gold cache via `--gold-cache`.
+  - `experiments/probe_gauntlet_dial.py` — gauntlet across the synthetic dial.
+  - `experiments/probe_ais_vs_pt.py` — first-order (EXP P) + schedule-resolution
+    (EXP S) + matched-compute (EXP M) AIS-vs-PT; report
+    `results/probe_ais_vs_pt.json`. See GAUNTLET + AIS-vs-PT FINDINGS block.
+  - `experiments/probe_logz.py` — route-2 logZ / free-energy probe: AIS logẐ vs
+    PT thermodynamic-integration vs exact logZ. EXP ZF (ferro schedule sweep:
+    logẐ schedule-sensitivity the order parameter hides) + EXP ZG (spin-glass
+    no-escape negative); report `results/probe_logz.json`. Route 2 CLOSED.
+  - `experiments/probe_first_order.py` — route-3 (last shot): engineered no-escape
+    first-order instance via a deep-narrow vs wide-shallow two-basin Potts (EXP
+    FO-A/B single-basin funnel control; FO-C/D two-basin double-well). Genuine
+    first-order well built (single-T Gibbs trapped) but AIS crosses on every
+    observable; report `results/probe_first_order.json`. Route 3 CLOSED → only
+    framing (i) survives.
+  - `experiments/probe_planted.py` — large-n PLANTED route (last un-closed door):
+    frustrated Potts glass + planted reward on each (t*_i,t*_j) edge entry →
+    plant-overlap is ground truth where exact Z is gone. Triangulated validation
+    (soft/hard overlap, clamped-at-plant stability control, score vs score(t*),
+    full gauntlet). Sparse = continuous transition / no barrier; dense (n=48,q=5,
+    deg=12,frust=5) = real large-n metastability wall (single-T Gibbs trapped,
+    burn-in-invariant) but PT AND AIS both cross to ≤0.024 plant-overlap. Report
+    `results/probe_planted.json` (+ `_frust4.json`, `_dense_hunt.json`). Obstruction
+    holds at large n; framing (i) confirmed. See GAUNTLET + AIS-vs-PT FINDINGS item 6.
